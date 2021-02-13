@@ -17,7 +17,7 @@ participant = [302 303 306 307 308 310];
 time = {'pre' 'post'};
 block = 1:3;
 
-prefix_EEG = 'reref ds art-sup ep dc YC';
+prefix_EEG = 'ds art-sup ep dc reref YC';
 prefix_EMG = 'bl ep notch but dc YC';
 
 %% parse events in all relevant datafiles
