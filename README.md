@@ -53,4 +53,19 @@ EMG: MEPs from M1
 
 RS-EEG
 ------------------------------------------------------------
--
+preprocessing:
+- GABA_rsEEG_preprocessing1.m
+- GABA_rsEEG_preprocessing2.m
+- GABA_rsEEG_preprocess.lwscript
+- GABA_rsEEG_umica.lwscript
+
+RS-EEG analysis:
+- GABA_rsEEG_amplitude.m
+
+
+
+
+
+
+
+
