@@ -61,6 +61,8 @@ preprocessing:
 
 RS-EEG analysis:
 - GABA_rsEEG_amplitude.m
+- GABA_rsEEG_SE.m
+
 
 
 
