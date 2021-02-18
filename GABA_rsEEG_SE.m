@@ -3,51 +3,54 @@
 % Based on scripts and functions written by Michele A. Colombo from Massimini's lab, Milano
 % 
 % 1) Prepares data
-%       - Loads FFT transformed data (relative amplitude) - 'rsEEG_data_high.mat'
-%           --> medication * time * condition * participant * ROI * datapoint
-%       - Log-log transforms of the data
+%       - averages signal across ROIs
+
 
 %% parameters
 clear all 
 clc
 
 % dataset
-xstep = 0.25;
+load('rsEEG_data_high.mat');
+xstep = 0.25; xoffset = 0.1;
+medication = {'placeb' 'alprazolam'}; time = {'pre' 'post'}; condition = {'open' 'closed'};
+load('colours2.mat')
 
 % process
-window = [1 20; 20 40; 1 40]; 
-reg_method = 'ols';
+process = struct;
+process(1).band = 'low'; process(2).band = 'high'; process(3).band = 'broad'; 
+process(1).window = [1 20]; process(2).window = [20 40]; process(3).window = [1 40]; 
+process(1).method = 'ols'; process(2).method = 'ols'; process(3).method = 'ols';
 
-% a = 1; 
+% a = 1; m = 1; t = 1; c = 1; p = 1; r = 1; 
 
-%% 1) prepare data, log-log transform
-% load the data
-load('rsEEG_data_high.mat');
-
-for a = 1:size(window, 1)
-    % choose data
-    x_start = ; 
-    x_end = ;
-    x = window(a, 1):xstep:window(a, 2); 
-    data = data_high(:, :, :, :, :, x_start : x_end);
-
-    % avoid zeros 
-    zero = data == 0; data(zero)=[]; x(zero)=[]; 
+%% 1) prepare data
+% average data across regions
+for m = 1:size(data_high, 1)
+    for t = 1:size(data_high, 2)
+        for c = 1:size(data_high, 3)
+            for p = 1:size(data_high, 4)
+                for i = 1:size(data_high, 6)
+                   data(m, t, c, p, i) = mean(data_high(m, t, c, p, :, i));
+                end
+            end
+        end
+    end
 end
- 
-% log transform
-x = log10(x);
-data_visual_open = log10(data_visual_open);
-data_visual_closed = log10(data_visual_closed);
+clear data_high
 
-% interpolate in log-log: X, Y --> Xi, Yi
- stepsFrex= (diff( XX)); stepsFrex= round(stepsFrex.*1000)./1000;
- if length( unique(stepsFrex))==1 %IF frex is a vector of linearly increasing frex, try
-     XXi= logspace( X(1), X(end),  length(X)*4); % 2^10*2;--> auto-chosen
-      Xi= log10(XXi); 
-     Yi= interpn( X, Y,  (Xi) );% interpn ,'spline', 'nearest' 
-     YYi= 10.^(Yi); 
- else % catch
-     XXi= XX;  Xi= log10(XXi); 
-     YYi= YY;  Yi= log10(YYi); disp('could not upsample PSD')
- end
+% chops datasets by target fbands
+for a = 1:numel(process)
+    % choose original FFT data: x, data
+    x_start = ceil((process(a).window(1) - xoffset) / xstep); 
+    x_end = ceil((process(a).window(2) - xoffset) / xstep);
+    x = process(a).window(1):xstep:process(a).window(2); 
+    process(a).x = x;
+    process(a).data = data(:, :, :, :, x_start : x_end);   
+end
+clear x_start x_end x
+   
+%% 2) fit  power law in 3 steps
+% loop 
+[insl, st, pp] = fitPowerLaw3steps(frex( myX),  myY( myX),[], 0); hold on
+
