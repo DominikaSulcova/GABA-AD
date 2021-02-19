@@ -3,14 +3,18 @@
 % Based on scripts and functions written by Michele A. Colombo from Massimini's lab, Milano
 % 
 % 1) Prepares data
-%       - averages signal across ROIs
+%       - averages signals across ROIs
 %       - cuts x and data according to target fband windows and saves in a
-%         structure --> process.x; process.data
+%         structure --> spect_exp.x; spect_exp.data
 % 2) Fits the power using Michele's function 
-%       - in 3 steps
-%       --> outcome variables:  intslo(1)
-%                               intslo(2)                   
-%                               
+%       - in 3 steps - first fit, alpha peak removal,second fit
+%       - possible to visualize individual curves --> plot_i = 1
+%       --> outcome variables:  intslo(1) = spect_exp.result.intercept
+%                               intslo(2) = spect_exp.result.islope = SE beta
+% 3) Performs group SE visualization
+%       - extracts mean values 
+%       - extracts individual SE change 
+%       --> boxplot + scatter plot
 
 
 %% parameters
@@ -22,12 +26,14 @@ load('rsEEG_data_high.mat');
 medication = {'placebo' 'alprazolam'}; 
 time = {'pre' 'post'}; 
 condition = {'open' 'closed'};
+participant = 1:20;
 
 % process
-do_plot = 1;
+plot_i = 1;     
 xstep = 0.25; 
 xoffset = 0.1;
 load('colours2.mat')
+figure_counter = 1;
 
 % outcome structure
 spect_exp = struct;
@@ -35,7 +41,7 @@ spect_exp(1).band = 'low'; spect_exp(2).band = 'high'; spect_exp(3).band = 'broa
 spect_exp(1).window = [1 20]; spect_exp(2).window = [20 40]; spect_exp(3).window = [1 40]; 
 spect_exp(1).method = 'ols'; spect_exp(2).method = 'ols'; spect_exp(3).method = 'ols';
 
-% a = 1; m = 1; t = 1; c = 1; p = 1; r = 1; 
+% a = 2; m = 1; t = 1; c = 1; p = 1; r = 1; 
 
 %% 1) prepare data
 % average data across regions
@@ -52,14 +58,16 @@ for m = 1:size(data_high, 1)
 end
 clear data_high
 
-% chops datasets by target fbands
+% chop datasets by target fbands
 for a = 1:numel(spect_exp)
-    % choose original FFT data: x, data
+    % crop data
     x_start = ceil((spect_exp(a).window(1) - xoffset) / xstep); 
     x_end = ceil((spect_exp(a).window(2) - xoffset) / xstep);
-    x = spect_exp(a).window(1):xstep:spect_exp(a).window(2); 
-    spect_exp(a).x = x;
     spect_exp(a).data = data(:, :, :, :, x_start : x_end);   
+    
+    % indentify x
+    x = spect_exp(a).window(1):xstep:spect_exp(a).window(2);
+    spect_exp(a).x = x;
 end
 clear x_start x_end x data
 clear a m t c p r i
@@ -83,7 +91,7 @@ for a = 1:numel(spect_exp)
                     col = colours2((m - 1)*2 + t, :);
                     
                     % fit current dataset
-                    [intslo, stats, amps] = fitPowerLaw3steps(x, data, spect_exp(a).method, do_plot, col); 
+                    [intslo, stats, amps] = fitPowerLaw3steps(x, data, spect_exp(a).method, plot_i, col); 
 %                     hold on
                     
                     % fill in the outcome structure
@@ -91,15 +99,128 @@ for a = 1:numel(spect_exp)
                     spect_exp(a).result.slope(m, t, c, p) = intslo(2);                    
                     
                     % clear figure
-                    clf
+                    if p == 1
+                        go = waitforbuttonpress;
+                        if go
+                            clf
+                        else 
+                          pause(5)
+                        end
+                    else
+                        clf
+                    end
                 end 
             end
         end
     end
 end
-clear dataset_name x data col intslo stats amps fig
+clear dataset_name x data col intslo stats amps fig 
 clear a m t c p i
 
 % save outcome structure
-save('xpect_exp.mat', 'spect_exp')
+save('rsEEG_spect_exp.mat', 'spect_exp')
+
+%% 3) group visualization 
+% extract mean SE values
+for a = 1:numel(spect_exp)  
+    for m = 1:size(spect_exp(a).data, 1)
+        for t = 1:size(spect_exp(a).data, 2)
+            for c = 1:size(spect_exp(a).data, 3)
+                avg_se(m, t, c) = mean(spect_exp(a).result.slope(m, t, c, :));                
+                avg_sem(m, t, c) = std(spect_exp(a).result.slope(m, t, c, :))/sqrt(length(participant));                               
+            end
+        end
+    end
+end
+
+% plot group boxplot
+for a = 1:numel(spect_exp)  
+    for c = 1:length(condition)
+        % choose the data
+        data_visual = [];
+        for m = 1:length(medication)
+            for t = 1:length(time)
+                data_i = squeeze(spect_exp(a).result.slope(m, t, c, :));
+                data_visual = cat(2, data_visual, data_i);
+            end
+        end
+
+        % plot group boxplot
+        fig = figure(figure_counter);        
+        boxplot(data_visual, 'color', colours2)
+        hold on
+        
+        % plot the lines - placebo
+        for p = 1:length(participant)
+            p_placebo(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+                'Color', [0.75, 0.75, 0.75],...
+                'MarkerSize', 10,...
+                'MArkerEdge', 'none');
+            hold on
+        end
+        
+        % plot the lines - alprazolam
+        for p = 1:length(participant)
+            p_alprazolam(p) = plot([3 4], data_visual(p, [3 4]), '-',...
+                'Color', [0.75, 0.75, 0.75],...
+                'MarkerSize', 10,...
+                'MArkerEdge', 'none');
+            hold on
+        end
+
+        % plot the markers
+        for b = 1:4
+            scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+                75, colours2(b, :), 'filled');
+            hold on
+        end
+        
+        % add parameters
+        figure_title = ['SPECTRAL EXPONENT: ' spect_exp(a).band ' band window, eyes ' condition{c}];
+        figure_name = ['rsEEG_' spect_exp(a).band '_' condition{c}];
+        yl = get(gca, 'ylim');
+        set(gca, 'xtick', 1:4, 'xticklabel', {'pre' 'post' 'pre' 'post'})
+        set(gca, 'Fontsize', 16)
+        title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+        xlabel('time relative to medication'); ylabel('spectral exponent');
+        ylim([yl(1), yl(2) + 0.1])
+        text(1.3, yl(2) + 0.05, 'placebo', 'fontsize', 16, 'color', colours2(2, :));
+        text(3.3, yl(2) + 0.05, 'alprazolam', 'fontsize', 16, 'color', colours2(4, :));
+        hold off
+
+        % save the figure
+        pause(5)        
+        savefig([figure_name '.fig'])
+        saveas(fig, [figure_name '.png'])
+
+        % update the counter
+        figure_counter = figure_counter + 1;        
+    end
+end
+clear data_i data_visual figure_name figure_title p_placebo p_alprazolam scat yl
+
+
+% plot group scaterplot of individual change
+                % choose names
+                figure_name = ['rsEEG_SE_' medication{m} '_' time{t} '_' condition{c}];
+                figure_title = ['SPECTRAL EXPONENT: ' medication{m} ' - ' time{t} 'medication - eyes ' condition{c}];
+
+
+%% plot average log-log figures
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
