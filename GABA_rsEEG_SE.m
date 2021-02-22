@@ -14,7 +14,7 @@
 % 3) Performs group SE visualization
 %       - extracts mean values 
 %       - extracts individual SE change 
-%       --> boxplot + scatter plot
+%       - visualize with box + scatter plots
 
 
 %% parameters
@@ -29,9 +29,9 @@ condition = {'open' 'closed'};
 participant = 1:20;
 
 % process
-plot_i = 1;     
-xstep = 0.25; 
-xoffset = 0.1;
+plot_i = 0; plot_g = 1;           
+xstep = 0.25; xoffset = 0.1;
+z = 1.96;
 load('colours2.mat')
 figure_counter = 1;
 
@@ -92,7 +92,6 @@ for a = 1:numel(spect_exp)
                     
                     % fit current dataset
                     [intslo, stats, amps] = fitPowerLaw3steps(x, data, spect_exp(a).method, plot_i, col); 
-%                     hold on
                     
                     % fill in the outcome structure
                     spect_exp(a).result.intercept(m, t, c, p) = intslo(1);
@@ -121,7 +120,7 @@ clear a m t c p i
 save('rsEEG_spect_exp.mat', 'spect_exp')
 
 %% 3) group visualization 
-% extract mean SE values
+% ----- extract mean SE values -----
 for a = 1:numel(spect_exp)  
     for m = 1:size(spect_exp(a).data, 1)
         for t = 1:size(spect_exp(a).data, 2)
@@ -132,8 +131,9 @@ for a = 1:numel(spect_exp)
         end
     end
 end
+clear a m t c
 
-% plot group boxplot
+% ----- plot group boxplot -----
 for a = 1:numel(spect_exp)  
     for c = 1:length(condition)
         % choose the data
@@ -183,9 +183,20 @@ for a = 1:numel(spect_exp)
         set(gca, 'Fontsize', 16)
         title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
         xlabel('time relative to medication'); ylabel('spectral exponent');
-        ylim([yl(1), yl(2) + 0.1])
-        text(1.3, yl(2) + 0.05, 'placebo', 'fontsize', 16, 'color', colours2(2, :));
-        text(3.3, yl(2) + 0.05, 'alprazolam', 'fontsize', 16, 'color', colours2(4, :));
+        ylim([yl(1) - 0.05, yl(2) + 0.1])
+        hold on
+        
+        % add text
+        for m = 1:length(medication)
+            for t = 1: length(time)
+                txt((m - 1)*2 + t) = text((m - 1)*2 + t - 0.3, yl(1) - 0.01,...
+                    ['mean: ' num2str(round(avg_se(m, t, c), 3))],...
+                    'fontsize', 12, 'color', [0.4 0.4 0.4]);
+                hold on
+            end
+        end
+        txt(end + 1) = text(1.3, yl(2) + 0.05, 'placebo', 'fontsize', 16, 'color', colours2(2, :));
+        txt(end + 1) = text(3.3, yl(2) + 0.05, 'alprazolam', 'fontsize', 16, 'color', colours2(4, :));
         hold off
 
         % save the figure
@@ -197,18 +208,155 @@ for a = 1:numel(spect_exp)
         figure_counter = figure_counter + 1;        
     end
 end
-clear data_i data_visual figure_name figure_title p_placebo p_alprazolam scat yl
+clear data_i data_visual figure_name figure_title p_placebo p_alprazolam scat yl txt 
+clear a b m c p
 
+% ----- calculate individual change ----- 
+for a = 1:numel(spect_exp)  
+    for m = 1:size(spect_exp(a).data, 1)
+        for c = 1:size(spect_exp(a).data, 3)
+            for p = 1:size(spect_exp(a).data, 4)
+                spect_exp(a).result.slopechange(m, c, p) = spect_exp(a).result.slope(m, 2, c, p) - spect_exp(a).result.slope(m, 1, c, p);                                             
+            end
+        end
+    end
+end
+clear a m c p
 
-% plot group scaterplot of individual change
-                % choose names
-                figure_name = ['rsEEG_SE_' medication{m} '_' time{t} '_' condition{c}];
-                figure_title = ['SPECTRAL EXPONENT: ' medication{m} ' - ' time{t} 'medication - eyes ' condition{c}];
+% ----- plot group boxplot of individual change ----- 
+for a = 1:numel(spect_exp)  
+    % choose the data
+    data_visual = [];
+    for c = 1:length(condition) 
+        for m = 1:length(medication)
+            data_i = squeeze(spect_exp(a).result.slopechange(m, c, :));
+            data_visual = cat(2, data_visual, data_i);
+        end
+    end
+     
+    % plot group boxplot
+    col = colours2([2 4 2 4], :);
+    fig = figure(figure_counter);        
+    boxplot(data_visual, 'color', col)
+    hold on
+    
+    % add zero line
+    xl = get(gca, 'xlim');
+    h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
+    hold on
 
+    % plot the lines - eyes open
+    for p = 1:length(participant)
+        p_open(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
 
-%% plot average log-log figures
+    % plot the lines - eyes closed
+    for p = 1:length(participant)
+        p_closed(p) = plot([3 4], data_visual(p, [3 4]), '-',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
 
+    % plot the markers
+    for b = 1:4
+        scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+            75, col(b, :), 'filled');
+        hold on
+    end
 
+    % add parameters
+    figure_title = ['SPECTRAL EXPONENT CHANGE - ' spect_exp(a).band ' band window'];
+    figure_name = ['rsEEG_SEchange_' spect_exp(a).band];
+    yl = get(gca, 'ylim');
+    set(gca, 'xtick', 1:4, 'xticklabel', {'placebo' 'alprazolam' 'placebo' 'alprazolam'})
+    set(gca, 'Fontsize', 16)
+    title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+    xlabel('medication'); ylabel('spectral exponent change');
+    ylim([yl(1) - 0.05, yl(2) + 0.1])
+    hold on
+
+    % add text
+    for b = 1:4
+        txt(b) = text(b - 0.3, yl(1) - 0.01,...
+            ['mean: ' num2str(round(mean(data_visual(:, b)), 3))],...
+            'fontsize', 12, 'color', [0.4 0.4 0.4]);
+        hold on
+    end
+    txt(end + 1) = text(1.25, yl(2) + 0.05, 'eyes open', 'fontsize', 16, 'color', [0 0 0]);
+    txt(end + 1) = text(3.25, yl(2) + 0.05, 'eyes closed', 'fontsize', 16, 'color', [0 0 0]);
+    hold off
+
+    % save the figure
+    pause(5)        
+    savefig([figure_name '.fig'])
+    saveas(fig, [figure_name '.png'])
+
+    % update the counter
+    figure_counter = figure_counter + 1;        
+
+end
+clear data_i data_visual xl h figure_name figure_title p_open p_closed scat yl txt col fig
+clear a b m c p
+
+%% 4) plot average log-log figures
+% separate figure per fband window, medication, and condition
+for a = 1:numel(spect_exp)  
+    % choose vector with frequency bins
+    x = spect_exp(a).x;
+    
+    % loop through datasets
+    for m = 1:length(mediction)
+        for c = 1:length(condition)  
+            for t = 1:length(time)
+                % ----- calculate mean values -----
+                for i = 1:size(spect_exp(a).data, 5)
+                    spect_exp(a).avgdata.data(m, t, c, i) = mean(squeeze(spect_exp(a).data(m, t, c, :, i)));
+                    spect_exp(a).avgdata.CI(m, t, c, i) = (std(squeeze(spect_exp(a).data(m, t, c, :, i)))/sqrt(length(participant)))*z;
+                end
+
+                % ----- fit power law to mean values -----
+                % choose data
+                data = squeeze(spect_exp(a).avgdata.data(m, t, c, :))';
+                
+                % choose plot colour
+                col = colours2((m - 1)*2 + t, :);
+
+                % fit current dataset
+                [intslo, stats, amps, devs] = fitPowerLaw3steps(x, data, spect_exp(a).method, plot_g, col); 
+                
+                % fill in the outcome structure
+                spect_exp(a).avgdata.data_int(m, t, c, p) = amps.obs;
+                spect_exp(a).avgdata.x_int(m, t, c, p) = amps.frex;   
+                spect_exp(a).avgdata.intercept(m, t, c, p) = intslo(1);
+                spect_exp(a).avgdata.slope(m, t, c, p) = intslo(2);  
+                
+                % ----- plot the final signal -----
+                % calculate and plot shading CI
+                
+                % plot the original signal
+                loglog(amps.frex, amps.obs, ':','color', col, 'linewidth', 1.5); hold on
+                
+                % highlight kept points
+                x_kept = amps.frex; x_kept(devs.rej)= nan;
+                loglog(x_kept, amps.obs, '-', 'color', col, 'LineWidth', 1.5); hold on;
+ 
+                % plot first fitted line
+                % plot second fitted line
+            end
+            % add legend
+            % add other parameters
+            % save figure            
+        end
+    end
+end
+clear data col x_kept intslo stats amps devs
+clear a m t c 
 
 
 
