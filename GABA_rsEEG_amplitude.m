@@ -29,6 +29,9 @@
 %       - separately from all frequency bands (=TOIs) and all ROIs
 %       --> saves as table - 'fband_amplitude.mat'; 'fband_amplitude.csv'
 % 7) Plots barplots with mean amplitudes for each ROI
+% 8) Calculates alpha attenuation coefficient (AAC)
+%       - 
+%       --> saves values as 'AAC.mat' and 'AAC.csv'
 
 %% parameters
 clear all; clc;
@@ -80,9 +83,9 @@ col = [1, 0.55, 0.55];
 load('colours.mat'); load('colours2.mat'); 
 
 % in case of repeted use:
-% load('rsEEG_data_high.mat'); load('rsEEG_data_low.mat') 
-% load('IAF.mat'); load('TF.mat')
-% load('fband.mat'); load('fband_amplitude.mat')
+load('rsEEG_data_high.mat'); load('rsEEG_data_low.mat') 
+load('IAF.mat'); load('TF.mat')
+load('fband.mat'); load('rsEEG_fband_amplitude.mat')
 
 %% 1) load data, pool channels into ROIs
 
@@ -791,6 +794,12 @@ end
 
 clear data_visual sem_visual
 
+%% 8) AAC 
+% ----- extract AAC -----
+% choose data - individual alpha subbands + broad alpha band
+% calculate individual AAC
+% calculate AAC change per medication
+% ----- plot box + scatter plot -----
 
 
 
