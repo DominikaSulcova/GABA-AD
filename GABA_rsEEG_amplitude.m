@@ -30,7 +30,9 @@
 %       --> saves as table - 'fband_amplitude.mat'; 'fband_amplitude.csv'
 % 7) Plots barplots with mean amplitudes for each ROI
 % 8) Calculates alpha attenuation coefficient (AAC)
-%       - 
+%       - for individual alpha subbands + broad alpha band
+%       - calculates individual AAC and AAC change 
+%       - plots box + scatter plots, saves figures
 %       --> saves values as 'AAC.mat' and 'AAC.csv'
 
 %% parameters
@@ -794,11 +796,11 @@ end
 
 clear data_visual sem_visual
 
-%% 8) AAC 
+%% 8) alpha attenuation coeficient  
 % ----- extract AAC -----
 % choose data - individual alpha subbands + broad alpha band
 % calculate individual AAC
-% calculate AAC change per medication
+% calculate AAC change 
 % ----- plot box + scatter plot -----
 
 
