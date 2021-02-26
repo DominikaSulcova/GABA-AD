@@ -60,14 +60,14 @@ clear labels_CS labels_TS
 
 % TOIs
 TOI = struct;
-TOI(1).band = 'delta'; TOI(1).definition = 'window(1) = 0.1; window(2) = tf - 2;'; TOI(1).sign = '?'; 
-TOI(2).band = 'theta'; TOI(2).definition = 'window(1) = tf - 2; window(2) = tf;'; TOI(2).sign = '?'; 
-TOI(3).band = 'alpha1'; TOI(3).definition = 'window(1) = tf; window(2) = tf + (iaf - tf)/2;'; TOI(3).sign = '?1'; 
-TOI(4).band = 'alpha2'; TOI(4).definition = 'window(1) =  tf + (iaf - tf)/2; window(2) = iaf;'; TOI(4).sign = '?2'; 
-TOI(5).band = 'alpha3'; TOI(5).definition = 'window(1) = iaf; window(2) = iaf + (iaf - tf)/2;'; TOI(5).sign = '?3'; 
-TOI(6).band = 'beta1'; TOI(6).definition = 'window(1) = iaf + (iaf - tf)/2; window(2) = 20;'; TOI(6).sign = '?1'; 
-TOI(7).band = 'beta2'; TOI(7).definition = 'window(1) = 20; window(2) = 30;'; TOI(7).sign = '?2'; 
-TOI(8).band = 'gamma'; TOI(8).definition = 'window(1) = 30; window(2) = 45;'; TOI(8).sign = '?'; 
+TOI(1).band = 'delta'; TOI(1).definition = 'window(1) = 0.1; window(2) = tf - 2;'; TOI(1).sign = '\delta'; 
+TOI(2).band = 'theta'; TOI(2).definition = 'window(1) = tf - 2; window(2) = tf;'; TOI(2).sign = '\theta'; 
+TOI(3).band = 'alpha1'; TOI(3).definition = 'window(1) = tf; window(2) = tf + (iaf - tf)/2;'; TOI(3).sign = '\alpha 1'; 
+TOI(4).band = 'alpha2'; TOI(4).definition = 'window(1) =  tf + (iaf - tf)/2; window(2) = iaf;'; TOI(4).sign = '\alpha 2'; 
+TOI(5).band = 'alpha3'; TOI(5).definition = 'window(1) = iaf; window(2) = iaf + (iaf - tf)/2;'; TOI(5).sign = '\alpha 3'; 
+TOI(6).band = 'beta1'; TOI(6).definition = 'window(1) = iaf + (iaf - tf)/2; window(2) = 20;'; TOI(6).sign = '\beta 1'; 
+TOI(7).band = 'beta2'; TOI(7).definition = 'window(1) = 20; window(2) = 30;'; TOI(7).sign = '\beta 2'; 
+TOI(8).band = 'gamma'; TOI(8).definition = 'window(1) = 30; window(2) = 45;'; TOI(8).sign = '\gamma'; 
 
 % import header basis
 load([prefix_1 ' high ' prefix_2 '1 placebo pre EEGcont open.lw6'], '-mat')
@@ -593,11 +593,16 @@ clear statement row iaf tf window delta theta alpha1 alpha2 alpha3 beta1 beta2 g
 
 %  ----- PLOT REPRESENTATIVE PARTICIPANT -----
 % choose data
-data_visual_open = squeeze(data_high(1, 1, 1, 1, 5, [1 : end - 1]))'; 
-data_visual_closed = squeeze(data_high(1, 1, 2, 1, 5, [1 : end - 1]))';  
+data_visual_open = squeeze(data_high(1, 1, 1, 1, 5, [8 : end-1]))'; 
+data_visual_closed = squeeze(data_high(1, 1, 2, 1, 5, [8 : end-1]))';  
 
 % x axis
-x = [0.1 : header_high.xstep : 45];
+window_visual = [2 45];
+x = [window_visual(1) : header_high.xstep : window_visual(2)];
+
+% logtransform 
+[x_log, open_log] = log_int(x, data_visual_open);
+[x_log, closed_log] = log_int(x, data_visual_closed);
 
 % identify IAF and TF
 rows = (IAF.subject == 1 & categorical(IAF.medication) == 'placebo' & categorical(IAF.time) == 'pre');
@@ -613,62 +618,60 @@ end
 
 % set limits of the figure
 fig = figure(figure_counter);
-plot(x, data_visual_closed, 'b:', 'LineWidth', 0.5)
+loglog(x_log, closed_log, 'b:', 'LineWidth', 0.5)
 yl = get(gca, 'ylim');
-clf
-ylim([-0.2, yl(2)])
-xlim([0.1, 45])
+ylim([yl(1), yl(2) + 0.1])
+xlim(window_visual)
 hold on
 
 % plot lower alpha window
-r1 = rectangle('Position', [fband_lim(2), 0, fband_lim(4) - fband_lim(2), yl(2)], 'FaceColor', [1 0.7 0.7], 'EdgeColor', 'none');
-r2 = rectangle('Position', [fband_lim(4), 0, fband_lim(5) - fband_lim(4), yl(2)], 'FaceColor', [1 0.6 0.6], 'EdgeColor', 'none');
+r1 = rectangle('Position', [fband_lim(2), yl(1) + 0.01, fband_lim(4) - fband_lim(2), yl(2) + 0.1], 'FaceColor', [1 0.7 0.7], 'EdgeColor', 'none');
+r2 = rectangle('Position', [fband_lim(4), yl(1) + 0.01, fband_lim(5) - fband_lim(4), yl(2) + 0.1], 'FaceColor', [1 0.6 0.6], 'EdgeColor', 'none');
 
 % plot lines between frequency bands (= TOIs)
 for a = 1:length(fband_lim)
-    l(a) = line([fband_lim(a), fband_lim(a)], [-0.2, yl(2)], 'Color', [0.9 0.9 0.9]); 
+    l(a) = line([fband_lim(a), fband_lim(a)], [yl(1), yl(2) + 0.1], 'Color', [0.6 0.6 0.6]); 
 end
-h = line([0.1, 45], [0, 0], 'Color', [0.9 0.9 0.9]);
+h = line([window_visual(1), window_visual(2)], [yl(1) + 0.01, yl(1) + 0.01], 'Color', [0.6 0.6 0.6]);
 
 % plot data
-pl(1) = plot(x, data_visual_open, 'Color', [0, 0, 0], 'LineWidth', 2, 'LineStyle', ':');
+pl(1) = loglog(x_log, open_log, 'Color', [0, 0, 0], 'LineWidth', 2.5, 'LineStyle', ':');
 hold on
-pl(2) = plot(x, data_visual_closed, 'Color', [0, 0, 0], 'LineWidth', 2);
+pl(2) = plot(x_log, closed_log, 'Color', [0, 0, 0], 'LineWidth', 2.5);
 hold on
 
 % plot IAF and TF
-v(1) = line([iaf, iaf], [-0.2, yl(2)], 'Color', colours2(4, :), 'LineWidth', 2);
-v(2) = line([tf, tf], [-0.2, yl(2)], 'Color', colours2(4, :), 'LineWidth', 2, 'LineStyle', '--');
+v(1) = line([iaf, iaf], [yl(1), yl(2) + 0.1], 'Color', colours2(4, :), 'LineWidth', 3);
+v(2) = line([tf, tf], [yl(1), yl(2) + 0.1], 'Color', colours2(4, :), 'LineWidth', 3, 'LineStyle', '--');
 
 % add names of frequency bands
-for a = 1:numel(TOI)
-    if a == 1
-        text(0.1 + ((fband_lim(a) - 0.1)/2), -0.09, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
-    elseif a == 8
-        text((fband_lim(a-1) + ((45 - fband_lim(a-1))/2)), -0.09, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
-    else
-        text((fband_lim(a-1) + ((fband_lim(a) - fband_lim(a-1))/2)), -0.09, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
-        hold on
-    end
-end
+% for a = 1:numel(TOI)
+%     if a == 1
+%         text(window_visual(1) + ((fband_lim(a) - 0.1)/2), yl(1) + 0.005, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
+%     elseif a == 8
+%         text((fband_lim(a-1) + ((window_visual(2) - fband_lim(a-1))/2)), yl(1) + 0.005, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
+%     else
+%         text((fband_lim(a-1) + ((fband_lim(a) - fband_lim(a-1))/2)), yl(1) + 0.005, TOI(a).sign, 'fontsize', 14, 'color', [0, 0, 0]);
+%         hold on
+%     end
+% end
 
 % add parameters  
 xlabel('frequency (Hz)')
-ylabel('relative amplitude (µV)')
-set(gca, 'FontSize', 14)
-title('frequency bands - example subject', 'FontWeight', 'bold', 'FontSize', 16)
+ylabel('relative amplitude')
+set(gca, 'FontSize', 16)
 
 % add legend 
-legend([pl, v], {'eyes open', 'eyes closed', 'IAF', 'TF'},...
-    'FontSize', 14,'position', [0.55, 0.55, 0.3, 0.3], 'edgecolor', [0.9 0.9 0.9])
-hold off
+legend(pl, {'eyes open', 'eyes closed'},...
+    'FontSize', 16,'position', [0.65, 0.65, 0.22, 0.22], 'edgecolor', [0.6 0.6 0.6])
+pause(5)
 
 % save figure
 figure_name = 'rsEEG_fbands_example';
 savefig(figure_name)
 saveas(fig, [figure_name '.png'])
 
-clear data_visual_open data_visual_closed x yl fband_lim r1 r2 l h a pl v tf iaf figure_name
+clear data_visual_open open_log data_visual_closed closed_log x x_log yl fband_lim r1 r2 l h a pl v tf iaf figure_name
 
 %% 6) extract mean amplitude values over frequency bands 
 % prepare a long format table for R
@@ -799,9 +802,170 @@ clear data_visual sem_visual
 %% 8) alpha attenuation coeficient  
 % ----- extract AAC -----
 % choose data - individual alpha subbands + broad alpha band
-% calculate individual AAC
-% calculate AAC change 
-% ----- plot box + scatter plot -----
+alpha_fbands = {'alpha1' 'alpha2' 'alpha3'};
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for c = 1:length(condition)
+            for a = 1:length(alpha_fbands)
+                % extract amplitude of individual alpha sub-bands
+                rows = (categorical(fband_amplitude.medication) == medication{m} & ...
+                    categorical(fband_amplitude.time) == time{t} & ...
+                    categorical(fband_amplitude.condition) == condition{c} & ...
+                    categorical(fband_amplitude.fband) == alpha_fbands{a});
+                data_aac(m, t, c, a, :) = fband_amplitude{rows, 'occipital'};
+            end
+            
+            % calculate broad band alpha amplitude
+            for p = 1:length(participant)
+                data_aac(m, t, c, a+1, p) =  sum(data_aac(m, t, c, [1:a], p));
+            end
+        end
+    end 
+end
+% update alpha bands
+alpha_fbands = [alpha_fbands, {'broad'}];
+alpha_fbands_txt = {'low alpha 1' 'low alpha 2'  'high alpha 3' 'broad alpha'};
 
+% calculate ACC
+for m = 1:length(medication)
+    % calculate individual AAC
+    for t = 1:length(time)
+        for a = 1:length(alpha_fbands)
+            for p = 1:length(participant)
+                ACC(m, t, a, p) = squeeze(data_aac(m, t, 2, a, p)) / squeeze(data_aac(m, t, 1, a, p));
+            end
+        end
+    end
+    
+    % calculate AAC change 
+    for a = 1:length(alpha_fbands)
+        for p = 1:length(participant)
+            ACC_change(m, a, p) = (ACC(m, 2, a, p)/ACC(m, 1, a, p))*100 - 100;
+        end
+    end
+end
+
+% ----- plot box + scatter plot -----
+% individual ACC - for each alpha band separately
+for a = 1:length(alpha_fbands)
+    % choose the data
+    data_visual = [];
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            data_i = squeeze(ACC(m, t, a, :));
+            data_visual = cat(2, data_visual, data_i);
+        end
+    end
+
+    % plot group boxplot
+    fig = figure(figure_counter);        
+    boxplot(data_visual, 'color', colours2)
+    hold on
+
+    % plot the lines - placebo
+    for p = 1:length(participant)
+        p_placebo(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
+
+    % plot the lines - alprazolam
+    for p = 1:length(participant)
+        p_alprazolam(p) = plot([3 4], data_visual(p, [3 4]), '-',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
+
+    % plot the markers
+    for b = 1:4
+        scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+            75, colours2(b, :), 'filled');
+        hold on
+    end
+
+    % add parameters
+    figure_title = ['ALPHA ATTENUATION COEFFICIENT: ' alpha_fbands_txt{a}];
+    figure_name = ['rsEEG_ACC_' alpha_fbands{a}];
+    yl = get(gca, 'ylim');
+    set(gca, 'xtick', 1:4, 'xticklabel', {'pre' 'post' 'pre' 'post'})
+    set(gca, 'Fontsize', 16)
+    title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+    xlabel('time relative to medication'); ylabel('alpha attenuation coefficient');
+    ylim([0, yl(2) + 1])
+    hold on
+
+    % add text
+    txt(1) = text(1.3, yl(2) + 0.5, 'placebo', 'fontsize', 16, 'color', colours2(2, :));
+    txt(2) = text(3.3, yl(2) + 0.5, 'alprazolam', 'fontsize', 16, 'color', colours2(4, :));
+    hold off
+
+    % save the figure
+    pause(5)        
+    savefig([figure_name '.fig'])
+    saveas(fig, [figure_name '.png'])
+
+    % update the counter
+    figure_counter = figure_counter + 1;        
+end
+
+% ACC change - for each alpha band separately
+for a = 1:length(alpha_fbands)
+    % choose the data
+    data_visual = [];
+    for m = 1:length(medication)
+        data_i = squeeze(ACC_change(m, a, :));
+        data_visual = cat(2, data_visual, data_i);
+    end
+
+    % plot group boxplot
+    col = colours2([2 4], :);
+    fig = figure(figure_counter);        
+    boxplot(data_visual, 'color', col)
+    hold on
+    
+    % add zero line
+    xl = get(gca, 'xlim');
+    h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
+    hold on
+
+    % plot the lines
+    for p = 1:length(participant)
+        p_open(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
+
+    % plot the markers
+    for b = 1:size(data_visual, 2)
+        scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+            75, col(b, :), 'filled');
+        hold on
+    end
+
+    % add parameters
+    figure_title = ['AAC CHANGE: ' alpha_fbands_txt{a}];
+    figure_name = ['rsEEG_ACCchange_' alpha_fbands{a}];
+    yl = get(gca, 'ylim');
+    set(gca, 'xtick', [1 2], 'xticklabel', {'placebo' 'alprazolam'})
+    set(gca, 'Fontsize', 16)
+    title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+    xlabel('medication'); ylabel('AAC change');
+    ylim([yl(1), yl(2)])
+    hold off
+
+    % save the figure
+    pause(5)        
+    savefig([figure_name '.fig'])
+    saveas(fig, [figure_name '.png'])
+
+    % update the counter
+    figure_counter = figure_counter + 1;        
+end
 
 
