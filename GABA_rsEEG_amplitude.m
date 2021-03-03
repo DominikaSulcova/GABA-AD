@@ -844,6 +844,7 @@ for m = 1:length(medication)
         end
     end
 end
+save('ACC.mat', 'ACC'); save('ACC_change.mat', 'ACC_change'); 
 
 % ----- plot box + scatter plot -----
 % individual ACC - for each alpha band separately

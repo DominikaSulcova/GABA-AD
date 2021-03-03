@@ -223,6 +223,7 @@ for a = 1:numel(spect_exp)
         end
     end
 end
+save('rsEEG_spect_exp.mat', 'spect_exp')
 clear a m c p
 
 % ----- plot group boxplot of individual change ----- 
