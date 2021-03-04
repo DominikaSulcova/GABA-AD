@@ -22,7 +22,8 @@
 % 4) MEP
 % 
 % ----- STATISTICS -----
-% 5)
+% 5) Plots correlation matrix: TEP amplitude change vs. RS-EEG markers
+% 6) Plots correlation matrix: SICI vs. RS-EEG markers
 
 %% parameters
 % dataset
@@ -307,7 +308,7 @@ save('GABA_results.mat', 'GABA_results')
 peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
 varnames = [peaks, {'AAC' 'SEo' 'SEc'}];
 
-% extract data
+% ----- extract data -----
 for m = 1:length(medication)
     for s = [1 2]
         % change in TEPs 
@@ -332,7 +333,7 @@ for m = 1:length(medication)
 end
 clear statement m s p k
 
-% plot correlation matrix
+% ----- correlation matrix: sessions separately -----
 varnames = [peaks, {'AAC' 'SEo' 'SEc'}];
 for m = 1:length(medication)
     for s = [1 2]        
@@ -343,8 +344,8 @@ for m = 1:length(medication)
 end
 clear varnames data_cor m s     
 
-%% 5) SICI/RS-EEG correlation
-% extract data
+%% 6) SICI/RS-EEG correlation
+% ----- extract data -----
 for m = 1:length(medication)
     % change in SICI
     for k = 1:length(peaks)
@@ -366,7 +367,7 @@ for m = 1:length(medication)
 end
 clear m p k
 
-% plot correlation matrix
+% ----- correlation matrix: sessions separately -----
 for m = 1:length(medication)    
     corrplot(squeeze(data_cor(m, :, :)), 'type', 'Spearman', 'testR', 'on', 'varNames', varnames);
     set(gcf, 'Name', [medication{m} ' - SICI x RS-EEG markers'])
