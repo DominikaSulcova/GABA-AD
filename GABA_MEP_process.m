@@ -10,7 +10,13 @@
 % 2) Discards all epochs that at any point depass <threshold> value 
 % 3) Saves the dataset, updates outcome table + saves outcome figure
 % 
-% ----- didentify zero epochs ----- 
+% ----- extract peak-to-peak amplitude ----- 
+% 4) Calculates the amplitude for each epoch
+% 5) Identifies zero epochs
+% 6) Generates averaged files, calculates mean amplitude
+%       - two files with ('zero') and without zero epochs ('nozero')
+%       - mean p2p amplitude --> in the 'output' table
+%       - saves final datasets and the output variable
 
 
 %% parameters
@@ -24,13 +30,17 @@ time = {'pre' 'post'};
 stimulus = {'TS' 'ppTMS'};
 
 % output
-prefix_new = 'clean';
-output_name = 'GABA_MEP_filtered';
+prefix_1 = 'clean';
+prefix_2 = {'zero' 'nozero'};
+output_name = 'GABA_MEP';
 
-% filter
+% baseline filter
 baseline = -0.1;
 threshold = 20;
 allow_sd = 3;
+
+% amplitude
+window = [0.02 0.04];
 
 % visualization
 figure_counter = 1;
@@ -291,7 +301,7 @@ for p = 1:length(participant)
                 header.datasize(1) = header.datasize(1) - length(discarded_pos);
                 header.events(discarded_pos)= [];
                 header.events = header.events';
-                header.name = [prefix_new ' ' dataset_name];
+                header.name = [prefix_1 ' ' dataset_name];
                 save([header.name '.lw6'], 'header')         
 
                 % modify and save data
@@ -311,7 +321,7 @@ for p = 1:length(participant)
                 save([output_name '.mat'], 'output') 
 
                 % save and close the figure
-                figure_name = [prefix_new '_YC' num2str(participant(p)) '_' session{n} '_' time{t} '_' stimulus{s}];
+                figure_name = [prefix_1 '_YC' num2str(participant(p)) '_' session{n} '_' time{t} '_' stimulus{s}];
                 savefig(fig, [figure_name '.fig'])
                 close(fig)
 
@@ -321,7 +331,45 @@ for p = 1:length(participant)
         end
     end
 end
+clear M
 
-%% ZERO RESPONSE EPOCHS
+%% PEAK-TO-PEAK AMPLITUDE
+for p = 1:length(participant)
+    for n = 1:length(session)
+        for t = 1:length(time)
+            for s = 1:length(stimulus)
+                %% 4) extract p2p amplitude
+                % load data and header
+                load([prefix_1 ' complete ' stimulus{s} ' YC' num2str(participant(p)) ' ' session{n} ' ' time{t} ' EMG.mat']);
+                load([prefix_1 ' complete ' stimulus{s} ' YC' num2str(participant(p)) ' ' session{n} ' ' time{t} ' EMG.lw6'], '-mat');
+                
+                % extract extreme values
+                for e = 1:header.datasize(1)
+                    % choose the window
+                    x_start = ceil((window(1) - header.xstart)/header.xstep);
+                    x_end = ceil((window(2) - header.xstart)/header.xstep);
+                    
+                    % identify extremes
+                    y_max = max(squeeze(data(e, 1, 1, 1, 1, x_start:x_end)));
+                    y_min = min(squeeze(data(e, 1, 1, 1, 1, x_start:x_end)));
+                    amp(e) = y_max - y_min; 
+                end
+                
+                %% identify zero response
+            end 
+        end
+    end
+end
+clear x_start x_end
+
+% apend results
+output.final_zero = zero;
+output.amplitude_zero = amp_zero;
+output.final_nozero = nozero;
+output.amplitude_nozero = amp_nozero;
+
+% save averaged files
+
+
 
                
