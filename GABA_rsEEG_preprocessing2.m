@@ -32,10 +32,10 @@ for a = 1 : size(med_session, 1)
         end
     end
 end
+clear a b
 
 %% replace the session number in the name by corresponding medication
-% loop through datasets
-% p = 1; s = 1; t = 1; c = 1; f = 1;   
+% loop through datasets  
 for p = 1:length(participant)
     for s = 1:length(session)
         this_session = med_session(participant(p), s+1);
@@ -43,10 +43,9 @@ for p = 1:length(participant)
             for c = 1:length(condition)
                 for f = 1:length(frequency)
                     % rename fully filtered data (all artifactual ICAs removed)
-                    name_data = ['fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' session{s} ' ' time{t} ' EEGcont ' condition{c} '.mat'];
-                    name_header = ['fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' session{s} ' ' time{t} ' EEGcont ' condition{c} '.lw6'];
-                    load(name_data);
-                    load(name_header, '-mat');
+                    name_old = ['fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' session{s} ' ' time{t} ' EEGcont ' condition{c}];
+                    load([name_old '.mat']);
+                    load([name_old '.lw6'], '-mat');
                     
                     % save under new name
                     name_new = ['fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' char(this_session) ' ' time{t} ' EEGcont ' condition{c}];
@@ -56,15 +55,13 @@ for p = 1:length(participant)
                 end 
             end
         end
-    end
-    clear name_data name_header name_new data header
+    end    
     message = ['Participant n.' num2str(participant(p)) ' finished.'];
     disp(message)
 end
+clear p s t c f name_old name_new data header
 
 %% merge epochs of each category
-% m = 1; t = 1; c = 1; s = 1; p = 1; 
-
 % create 'merge_idx' variable for epoch merging
 merge_idx = 1:numel(participant);
 
@@ -72,7 +69,7 @@ merge_idx = 1:numel(participant);
 for m = 1:numel(medication)
     for t = 1:numel(time)        
         for c = 1:numel(condition)
-            disp(['>>>>> Processing : ' medication{m} ' - ' time{t} ' - ' condition{c} ' <<<<<'])
+            disp(['>>> ' medication{m} ' - ' time{t} ' - ' condition{c} ' <<<'])
             for f = 1:numel(frequency)
                 disp(['..... ' frequency{f} ' frequency .....'])              
                 
@@ -88,23 +85,19 @@ for m = 1:numel(medication)
                 clear data header
 
                 % merge datasets
-                [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx);
+                [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx);                
                 
-                % create new name
-                name_new = ['merged fft ' frequency{f} ' ' medication{m} ' ' time{t} ' EEGcont ' condition{c}];
-
                 % save the data
+                name_new = ['merged fft ' frequency{f} ' ' medication{m} ' ' time{t} ' EEGcont ' condition{c}];
                 save([name_new '.mat'], 'data')
 
                 % save the header
                 header.name = name_new;
-                save([name_new '.lw6'], 'header')
-                
-                disp('... done.')            
+                save([name_new '.lw6'], 'header')                        
             end
         end
     end    
 end
-clear data header 
-disp('>>>>>>> All done. <<<<<<<')
+clear data header name_new name_old datasets message_string
+disp('>>> All done. <<<')
 
