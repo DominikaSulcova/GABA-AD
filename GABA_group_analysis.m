@@ -26,6 +26,8 @@
 % 6) Plots correlation matrix: SICI vs. RS-EEG markers
 
 %% parameters
+clear all, clc
+
 % dataset
 participant = 1:20;
 stimulus = {'CS' 'TS' 'ppTMS'};
@@ -168,7 +170,7 @@ clear rows sici_i statement SICI
 save('GABA_results.mat', 'GABA_results')
 
 %% 3) extract RS-EEG measures
-% dataset info --> ICs, epochs etc.
+% dataset info 
 for p = 1:length(participant)
     for m = 1:length(medication)
         GABA_results(p).rsEEG(m).medication = medication{m};
@@ -302,6 +304,71 @@ clear a c f m p t
 save('GABA_results.mat', 'GABA_results')
 
 %% 4) extract MEP measures
+% load data
+load('GABA_MEP.mat')
+
+% extract info 
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        GABA_results(p).MEP(m).medication = medication{m};        
+        
+        % loop through the output table
+        for s = [2,3] % stimulus --> TS, ppTMS
+            for t = 1:length(time)
+                % choose the row
+                rows = (output.subject == p & ...
+                    categorical(output.medication) == medication{m} & ...
+                    categorical(output.stimulus) == stimulus{s} & ...
+                    categorical(output.time) == time{t});
+                
+                % MEP - with zero reposnses
+                statement = ['GABA_results(p).MEP(m).' stimulus{s} '.' time{t} '.amplitude = output.amplitude_zero(rows);'];
+                eval(statement)
+                statement = ['GABA_results(p).MEP(m).' stimulus{s} '.' time{t} '.epochs = output.epochs_zero(rows);'];
+                eval(statement)
+                
+                % MEP - without zero reposnses
+                statement = ['GABA_results(p).MEP(m).' stimulus{s} '.' time{t} '.amplitude_nozero = output.amplitude_nozero(rows);'];
+                eval(statement)
+                statement = ['GABA_results(p).MEP(m).' stimulus{s} '.' time{t} '.epochs_nozero = output.epochs_nozero(rows);'];
+                eval(statement)                               
+            end
+            
+            % calculate MEP change --> % baseline
+            rows_pre = (output.subject == p & ...
+                    categorical(output.medication) == medication{m} & ...
+                    categorical(output.stimulus) == stimulus{s} & ...
+                    categorical(output.time) == 'pre');
+            rows_post = (output.subject == p & ...
+                    categorical(output.medication) == medication{m} & ...
+                    categorical(output.stimulus) == stimulus{s} & ...
+                    categorical(output.time) == 'post');
+            MEP_change = output.amplitude_zero(rows_post) / output.amplitude_zero(rows_pre) * 100;
+            statement = ['GABA_results(p).MEP(m).' stimulus{s} '.change = ' num2str(MEP_change) ';'];
+            eval(statement)            
+        end
+        
+        % calculate SICI --> % TS
+        for t = 1:length(time)
+            rows_TS = (output.subject == p & ...
+                    categorical(output.medication) == medication{m} & ...
+                    categorical(output.stimulus) == 'TS' & ...
+                    categorical(output.time) == time{t});
+            rows_ppTMS = (output.subject == p & ...
+                    categorical(output.medication) == medication{m} & ...
+                    categorical(output.stimulus) == 'ppTMS' & ...
+                    categorical(output.time) == time{t});
+            MEP_SICI = output.amplitude_zero(rows_ppTMS) / output.amplitude_zero(rows_TS) * 100;
+            statement = ['GABA_results(p).MEP(m).SICI.' time{t} ' = ' num2str(MEP_SICI) ';'];
+            eval(statement)
+        end
+    end
+end
+clear output rows statement MEP_change rows_pre rows_post rows_TS rows_ppTMS MEP_SICI
+clear p m s t 
+
+% save
+save('GABA_results.mat', 'GABA_results')
 
 %% 5) TEP/RS-EEG correlation
 % parameters
@@ -344,7 +411,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor m s     
 
-%% 6) SICI/RS-EEG correlation
+%% 6) TEP SICI/RS-EEG correlation
 % ----- extract data -----
 for m = 1:length(medication)
     % change in SICI
