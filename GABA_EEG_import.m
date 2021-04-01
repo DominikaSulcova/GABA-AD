@@ -131,7 +131,7 @@ end
 % dataset parameters
 block = {'b1' 'b2' 'b3'};
 prefix = ['EEG M1 ' char(session_info{1}) ' ' char(session_info{2})];
-event_code = 'B - Stimulation';
+event_code = 'Stimulation';
 
 % % ------------------- WHEN RUNNING SECTION BY SECTION -------------------
 % % check for validity of raw data location 

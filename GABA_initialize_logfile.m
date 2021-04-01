@@ -13,7 +13,7 @@ fileID = fopen(filename,'w');
 fprintf(fileID, '******************************************************************************************************\r\n');
 fprintf(fileID, 'study: GABA-AD\r\n'); 
 fprintf(fileID, ['subject: ' [char(session_info{1}) char(session_info{2})] '\r\n']);
-fprintf(fileID, ['recorded: ' char(session_info{7}) '\r\n']);
+fprintf(fileID, ['recorded: ' char(session_info{3}) '\r\n']);
 fprintf(fileID, 'author: Dominika Sulcova\r\n');
 fprintf(fileID, '******************************************************************************************************\r\n');
 fprintf(fileID, '\r\n');
