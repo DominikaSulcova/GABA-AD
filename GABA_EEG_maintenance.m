@@ -23,3 +23,40 @@ for g = 1:length(group)
     end
 end
 clear g p t b e
+
+%% concatenate
+% params
+subject = {'01' '02' '03' '04'};
+intensity = {'stim_100' 'stim_120' 'stim_140'};
+position = {'across' 'along'};
+current = {'normal' 'reversed'}; 
+prefix = 'avg avgchan bl icfilt ica visual crop but fft-notchfilt prefilt prea P1';
+
+% loop 
+for i = 1:length(intensity)
+    for p = 1:length(position)
+        for c = 1:length(current)
+            % merge datasets
+            merge_idx = 1:length(subject);
+            datasets = struct;
+            for s = 1:length(subject)
+                name_old = [prefix ' ' subject{s} ' ' position{p} ' ' current{c} ' ' intensity{i}]; 
+                load([name_old '.lw6'], '-mat');
+                datasets(s).header = header;
+                load([name_old '.mat']);
+                datasets(s).data = data;
+            end
+            [header,data,message_string] = RLW_merge_epochs(datasets,merge_idx); 
+
+            % save datasets
+            name_new = ['merged ' position{p} ' ' current{c} ' ' intensity{i}];
+            save([name_new '.mat'], 'data')
+            header.name = name_new;
+            save([name_new '.lw6'], 'header')   
+        end
+    end
+end
+clear i c p s merge_idx data header message_string name_new name_old
+
+
+
