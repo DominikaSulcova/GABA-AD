@@ -74,12 +74,11 @@ for m = 1:numel(medication)
                 disp(['..... ' frequency{f} ' frequency .....'])              
                 
                 % create 'datasets' variable for epoch merging
-                name_old = ['avg fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' medication{m} ' ' time{t} ' EEGcont ' condition{c}];
                 datasets = struct;
                 for p = 1:numel(participant)
-                    load([name_old '.lw6'], '-mat');
+                    load(['avg fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' medication{m} ' ' time{t} ' EEGcont ' condition{c} '.lw6'], '-mat');
                     datasets(p).header = header;
-                    load([name_old '.mat']);
+                    load(['avg fft ' prefix_1 ' ' frequency{f} ' ' prefix_2 num2str(participant(p)) ' ' medication{m} ' ' time{t} ' EEGcont ' condition{c} '.mat']);
                     datasets(p).data = data;
                 end
                 clear data header

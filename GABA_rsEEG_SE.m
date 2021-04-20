@@ -49,13 +49,13 @@ spect_exp(1).method = 'ols'; spect_exp(2).method = 'ols'; spect_exp(3).method = 
 % a = 2; m = 1; t = 1; c = 1; p = 1; r = 1; 
 
 %% 1) prepare data
-% average data across regions
+% average data across regions, square the amplitude --> power
 for m = 1:size(data_high, 1)
     for t = 1:size(data_high, 2)
         for c = 1:size(data_high, 3)
             for p = 1:size(data_high, 4)
                 for i = 1:size(data_high, 6)
-                   data(m, t, c, p, i) = mean(data_high(m, t, c, p, :, i));
+                   data(m, t, c, p, i) = (mean(data_high(m, t, c, p, :, i)))^2;
                 end
             end
         end
