@@ -20,10 +20,41 @@
 %       - alpha attenuation coeficient
 %       - spectral exponent beta 
 % 4) MEP
+%       - peak-to-peak amplitude 
+%       - amplitude change
 % 
 % ----- STATISTICS -----
-% 5) Plots correlation matrix: TEP amplitude change vs. RS-EEG markers
-% 6) Plots correlation matrix: SICI vs. RS-EEG markers
+% 5) TEP x RS-EEG correlation
+%       - calculates correlation coefficients and p-values for following variables:
+%           - change in amplitude for all TEP peaks 
+%           - change in AAC - only high alpha 3
+%           - change in SE (eyes open and closed) - only 0.1 - 20Hz
+%       - plots a correlation matrix for each medication and stimulus, 
+%         visualize variable pairs that are significantly correlated 
+%           --> uses fcn correlation_preview.m
+%       - plots significantly correlated variables, shows regression line
+% 6) TEP x MEP correlation
+%       - calculates correlation coefficients and p-values for following variables:
+%           - change in amplitude for all TEP peaks 
+%           - change in MEP peak-to-peak amplitude
+%       - identifies significant correlations between MEP and any TEP peak change 
+%       - plots significantly correlated variables, shows regression line
+% 7) TEP SICI x MEP SICI correlation
+%       - only takes into an account data from the baseline, merges
+%       data from both sessions --> 40 trials in total (participant x session)
+%       - calculates correlation coefficients and p-values for following variables:
+%           - baseline SICI for all TEP peaks 
+%           - baseline SICI in MEPs 
+%       - identifies significant correlations between MEP and any TEP SICI
+%       - plots significantly correlated variables, shows regression line
+% 8) TEP SICI x TEP change correlation
+%       - calculates correlation coefficients and p-values for following variables:
+%           - baseline SICI for all TEP peaks 
+%           - change in TS TEP amplitude caused by the medication 
+%       - identifies significant correlations between baseline TEP SICI and
+%       drug-induced change in the same TEP peak
+%       - plots significantly correlated variables, shows regression line
+
 
 %% parameters
 clear all, clc
@@ -33,6 +64,13 @@ participant = 1:20;
 stimulus = {'CS' 'TS' 'ppTMS'};
 medication = {'placebo' 'alprazolam'};
 time = {'pre' 'post'};
+
+% stats, graphics
+peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
+alpha = 0.05;
+load('colours2.mat')
+shade = 0.2;
+figure_counter = 1;
 
 % RS-EEG
 condition = {'open' 'closed'};
@@ -370,9 +408,8 @@ clear p m s t
 % save
 save('GABA_results.mat', 'GABA_results')
 
-%% 5) TEP/RS-EEG correlation
+%% 5) TEP x RS-EEG correlation
 % parameters
-peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
 varnames = [peaks, {'AAC' 'SEo' 'SEc'}];
 
 % ----- extract data -----
@@ -400,59 +437,304 @@ for m = 1:length(medication)
 end
 clear statement m s p k
 
-% ----- correlation matrix: sessions separately -----
-varnames = [peaks, {'AAC' 'SEo' 'SEc'}];
+% ----- scatterplot to assess the distribution: sessions separately -----
 for m = 1:length(medication)
-    for s = [1 2]        
-        corrplot(squeeze(data_cor(m, s, :, :)), 'type', 'Spearman', 'testR', 'on', 'varNames', varnames);
-        set(gcf, 'Name', [medication{m} ' - ' stimulus{s} ' TEP change x RS-EEG marker'])
-        savefig(gcf, ['correlation_' medication{m} '_' stimulus{s} '_RS-EEG.fig'])
+    for s = [1 2]
+        % select the data                
+        mat_cor = squeeze(data_cor(m, s, :, :));
+        
+        % create correlation matrix
+        fig = correlation_preview(mat_cor, varnames); 
+        
+        % save figure
+        figure_name = ['correlation_overview_' medication{m} '_' stimulus{s}];
+        savefig([figure_name])
+        saveas(fig, [figure_name '.png'])             
     end
 end
-clear varnames data_cor m s     
+clear m s fig figure_name
 
-%% 6) TEP SICI/RS-EEG correlation
+% ----- significant correlation: sessions separately -----
+for m = 1:length(medication)
+    for s = [1 2]         
+        % identify significant cases 
+        [row, col] = find(tril(cor_p) < alpha & tril(cor_p) > 0);
+        
+        % plot significant cases
+        for a = 1:length(row)    
+            % prepare linear model: y ~ 1 + x
+            data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+            
+            % plot data + regression line
+            fig = figure(figure_counter);
+            hold on
+            plot_cor = plotAdded(data_model);
+            
+            % adjust parameters    
+            title([medication{m} ' - ' stimulus{s} ' : ' varnames{row(a)} ' ~ ' varnames{col(a)}])
+            xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+            set(gca, 'FontSize', 14)
+            plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+            plot_cor(1).MarkerEdgeColor = colours2(2, :); plot_cor(1).MarkerFaceColor = colours2(2, :);
+            plot_cor(2).Color = colours2(3, :); plot_cor(2).LineWidth = 2; 
+            plot_cor(3).Color = colours2(3, :); plot_cor(3).LineWidth = 2;
+            legend off
+            if data_model.Coefficients.Estimate(2) > 0
+                text_pos = [0.95 0.85];
+            else
+                text_pos = [0.15 0.05];
+            end
+            T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+            T(2) = text(0.05, text_pos(2), sprintf('r = %1.3f, p = %1.3f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+            set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); set(T(2), 'fontsize', 14);  
+            hold off
+            
+            % save figure and continue
+            figure_name = ['correlation_' medication{m} '_' stimulus{s} '_' varnames{row(a)} '_' varnames{col(a)}];
+            savefig([figure_name])
+            saveas(fig, [figure_name '.png'])
+            figure_counter = figure_counter + 1;
+        end
+    end
+end
+
+% % CORRELATION MATRIX - requires MATLAB Econometrics toolbox
+% for m = 1:length(medication)
+%     for s = [1 2]        
+%         corrplot(squeeze(data_cor(m, s, :, :)), 'type', 'Spearman', 'testR', 'on', 'varNames', varnames);
+%         set(gcf, 'Name', [medication{m} ' - ' stimulus{s} ' TEP change x RS-EEG marker'])
+%         savefig(gcf, ['correlation_' medication{m} '_' stimulus{s} '_RS-EEG.fig'])
+%     end
+% end
+
+clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m s a     
+
+%% 6) TEP x MEP correlation
+% parameters
+varnames = [peaks, {'MEP'}];
+
 % ----- extract data -----
 for m = 1:length(medication)
-    % change in SICI
+    % change in TEPs 
     for k = 1:length(peaks)
         for p = 1:numel(GABA_results)                
-            data_cor(m, p, k) = GABA_results(p).TEP(m).SICI.pre(k);               
+            data_cor(m, p, k) = GABA_results(p).TEP(m).TS.change(k);             
         end
     end
 
-    % change in AAC - high alpha 3 only
+    % change in MEPs
     for p = 1:numel(GABA_results)            
-        data_cor(m, p, k+1) = GABA_results(p).rsEEG(m).AAC.change(3);              
-    end
-
-    % change in SE - lower frequencies only
-    for p = 1:numel(GABA_results)            
-        data_cor(m, p, k+2) = GABA_results(p).rsEEG(m).SE.change.open(1);   
-        data_cor(m, p, k+3) = GABA_results(p).rsEEG(m).SE.change.closed(1);  
+        data_cor(m, p, k+1) = GABA_results(p).MEP(m).TS.change;              
     end
 end
 clear m p k
 
-% ----- correlation matrix: sessions separately -----
-for m = 1:length(medication)    
-    corrplot(squeeze(data_cor(m, :, :)), 'type', 'Spearman', 'testR', 'on', 'varNames', varnames);
-    set(gcf, 'Name', [medication{m} ' - SICI x RS-EEG markers'])
-    savefig(gcf, ['correlation_' medication{m} '_SICI_RS-EEG.fig'])
+% ----- significant correlation: sessions separately -----
+for m = 1:length(medication)
+    % calculate correlation coefficient and p values
+    mat_cor = squeeze(data_cor(m, :, :));
+    [cor_coef, cor_p] = corrcoef(mat_cor);
+
+    % identify significant cases 
+    [row, col] = find(cor_p < alpha );
+
+    % plot significant cases
+    for a = 1:length(row)    
+        % prepare linear model: y ~ 1 + x
+        data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+        
+        % choose only correlations that show TEP-MEP interactions
+        if row(a) == 6 | col(a) == 6
+            % plot data + regression line
+            fig = figure(figure_counter);
+            hold on
+            plot_cor = plotAdded(data_model);
+
+            % adjust parameters    
+            title([medication{m} ' : ' varnames{col(a)} ' ~ ' varnames{row(a)}])
+            xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+            set(gca, 'FontSize', 14)
+            plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+            plot_cor(1).MarkerEdgeColor = colours2(2, :); plot_cor(1).MarkerFaceColor = colours2(2, :);
+            plot_cor(2).Color = colours2(3, :); plot_cor(2).LineWidth = 2; 
+            plot_cor(3).Color = colours2(3, :); plot_cor(3).LineWidth = 2;
+            legend off
+            if data_model.Coefficients.Estimate(2) > 0
+                text_pos = [0.95 0.85 0.75];
+            else
+                text_pos = [0.25 0.15 0.05];
+            end
+            T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+            T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+            T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.3f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+            set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic');   
+            set(T(2), 'fontsize', 14); 
+            set(T(3), 'fontsize', 14, 'color', colours2(3, :)); 
+            hold off
+
+            % save figure and continue
+            figure_name = ['correlation_' medication{m} '_' varnames{row(a)} '_' varnames{col(a)}];
+            savefig([figure_name])
+            saveas(fig, [figure_name '.png'])
+            figure_counter = figure_counter + 1;
+        end
+    end
 end
-clear data_cor m 
+clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m a    
 
+%% 7) TEP SICI x MEP SICI correlation
+% parameters
+varnames = [peaks, {'MEP'}];
 
+% ----- extract data -----
+data_cor = [];
+for m = 1:length(medication)
+    % change in TEPs 
+    for k = 1:length(peaks)
+        for p = 1:numel(GABA_results)                
+            D(p, k) = GABA_results(p).TEP(m).SICI.pre(k);             
+        end
+    end
 
+    % change in MEPs
+    for p = 1:numel(GABA_results)            
+        D(p, k+1) = GABA_results(p).MEP(m).SICI.pre;              
+    end
+    
+    % append
+    data_cor = cat(1, data_cor, D);
+end
+clear D m p k
 
+% ----- significant correlation: sessions together -----
+% calculate correlation coefficient and p values
+[cor_coef, cor_p] = corrcoef(data_cor);
 
+% identify significant cases 
+[row, col] = find(cor_p < alpha);
 
+% plot significant cases
+for a = 1:length(row)    
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
 
+    % choose only correlations that show TEP-MEP interactions
+    if row(a) == 6 | col(a) == 6
+        % plot data + regression line
+        fig = figure(figure_counter);
+        hold on
+        plot_cor = plotAdded(data_model);
 
+        % adjust parameters    
+        title(['SICI : ' varnames{col(a)} ' ~ ' varnames{row(a)}])
+        xlabel(['SICI in ' varnames{row(a)}]); ylabel(['SICI in ' varnames{col(a)}]);
+        set(gca, 'FontSize', 14)
+        plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+        plot_cor(1).MarkerEdgeColor = colours2(2, :); plot_cor(1).MarkerFaceColor = colours2(2, :);
+        plot_cor(2).Color = colours2(3, :); plot_cor(2).LineWidth = 2; 
+        plot_cor(3).Color = colours2(3, :); plot_cor(3).LineWidth = 2;
+        legend off
+        if data_model.Coefficients.Estimate(2) > 0
+            text_pos = [0.95 0.85 0.75];
+        else
+            text_pos = [0.25 0.15 0.05];
+        end
+        T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+        T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+        T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+        set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+        set(T(2), 'fontsize', 14); 
+        set(T(3), 'fontsize', 14, 'color', colours2(3, :)); 
+        hold off
 
+        % save figure and continue
+        figure_name = ['correlation_SICI_' varnames{row(a)} '_' varnames{col(a)}];
+        savefig([figure_name])
+        saveas(fig, [figure_name '.png'])
+        figure_counter = figure_counter + 1;
+    end
+end
+clear varnames data_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a    
 
+%% 8) TEP change x TEP SICI correlation
+% parameters
+for a = 1:length(peaks)
+    peaks_SICI{a} = [peaks{a}, ' SICI'];
+end
+varnames = [peaks, peaks_SICI];
 
+ % ----- extract data -----
+for m = 1:length(medication)
+    % change in TEPs 
+    for k = 1:length(peaks)
+        for p = 1:numel(GABA_results)                
+            statement = ['data_cor(m, p, k) = GABA_results(p).TEP(m).TS.change(k);'];            
+            eval(statement)    
+        end
+    end
 
+    % TEP SICI
+    for k = 1:length(peaks)
+        for p = 1:numel(GABA_results)                
+            data_cor(m, p, length(peaks) + k) = GABA_results(p).TEP(m).SICI.pre(k);              
+        end
+    end
+end
+clear peaks_SICI a m p k
+
+% ----- significant correlation: sessions separately -----
+for m = 1:length(medication) 
+    % calculate correlation coefficient and p values
+    mat_cor = squeeze(data_cor(m, :, :));
+    [cor_coef, cor_p] = corrcoef(mat_cor);
+
+    % identify significant cases 
+    [row, col] = find(cor_p < alpha);
+
+    % plot significant cases
+    for a = 1:length(row)  
+        if row(a) > length(peaks) & col(a) > length(peaks)
+        elseif row(a) < length(peaks) + 1 & col(a) < length(peaks) + 1
+        elseif row(a) == length(peaks) + col(a) | col(a) == length(peaks) + row(a)
+            % prepare linear model: y ~ 1 + x
+            data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+
+            % plot data + regression line
+            fig = figure(figure_counter);
+            hold on
+            plot_cor = plotAdded(data_model);
+
+            % adjust parameters    
+            title([medication{m} ' : ' varnames{row(a)} ' ~ ' varnames{col(a)}])
+            xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+            set(gca, 'FontSize', 14)
+            plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+            plot_cor(1).MarkerEdgeColor = colours2(2, :); plot_cor(1).MarkerFaceColor = colours2(2, :);
+            plot_cor(2).Color = colours2(3, :); plot_cor(2).LineWidth = 2; 
+            plot_cor(3).Color = colours2(3, :); plot_cor(3).LineWidth = 2;
+            legend off
+            if data_model.Coefficients.Estimate(2) > 0
+                text_pos = [0.95 0.85 0.75];
+            else
+                text_pos = [0.25 0.15 0.05];
+            end
+            T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+            T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+            T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+            set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+            set(T(2), 'fontsize', 14); 
+            set(T(3), 'fontsize', 14, 'color', colours2(3, :));   
+            hold off
+
+            % save figure and continue
+            figure_name = ['correlation_' medication{m} '_' varnames{row(a)} '_' varnames{col(a)}];
+            savefig([figure_name])
+            saveas(fig, [figure_name '.png'])
+            figure_counter = figure_counter + 1;
+        end
+    end
+end
+clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m a 
 
 
 
