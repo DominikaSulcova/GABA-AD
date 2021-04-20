@@ -1,7 +1,7 @@
-%% Script to import EEG datasets 
-% Author: Dominika
-% Study: GABA-AD
-% Data: 
+%% IMPORT EEG DATA TO LETSWAVE
+% Written by Dominika for the GABA-AD project (2020)
+% 
+% Imports data:
 % 1) RS-EEG
 %       - 3 mins eyes open
 %       - 3 mins eyes closed
