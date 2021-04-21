@@ -22,10 +22,13 @@ Two different types of GABAA-mediated inhibition were investigated:
 _**Question 1: Does alprazolam change the outcome measures?**
 = Is there a time-related change that can be only observable after alprazolam, and not placebo?_
 
-_**Question 2: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
+_**Question 2: Are some of the alprazolam-induced changes in outcome measures site specific?**
+= Is there a difference between effects observed in M1 and AG TEPs?_
+
+_**Question 3: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
 Can we identify TEP component which changes in correlation with MEP change?_
 
-_Question 3:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?
+_Question 4:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?
 What are the similarities = changes that can be attributed in general to GABAA activation?_
 
 Experimental protocol
@@ -127,7 +130,9 @@ preprocessing:
 - GABA_EEG_parse_events.m
 - GABA_EEG_unblind.m
 - GABA_EEG_maintenance.m
+- GABA_EEG_correct_ppTMS.m
 - GABA_EEG_preprocess.lwscript
+- GABA_EEG_ffilt_crop.lwscript
 - GABA_EEG_ica_FFT.lwscript
 - GABA_EEG_ica_timecourse.lwscript
 
