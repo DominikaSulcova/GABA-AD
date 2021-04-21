@@ -17,11 +17,11 @@
 %       - mean p2p amplitude --> in the 'output' table
 %       - saves sorted data as LW dataset --> prefix 'nozero'
 % 
-% ----- Group analysis ----- 
+% ----- Visualization ----- 
 % 6) Unblinds medication for sessions
-% 7) Plots group values 
-%       - drug-induced change in spTMS MEPs --> box + scatterplots 
-%       - SICI
+% 7) Plots drug-induced change in spTMS MEPs 
+%       - box + scatterplots 
+% 8) Plots SICI 
 
 %% parameters
 clear all
