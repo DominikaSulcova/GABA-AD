@@ -2,10 +2,10 @@
 PhD project
 
 ------------------------------------------------------------
-##PROJECT DESCRIPTION
+PROJECT DESCRIPTION
 ------------------------------------------------------------
 
-###Experimental questions
+Experimental questions
 ------------------------------------------------------------
 The aims of the project are:
 1)  to characterize the inhibitory neurotransmission mediated by GABA A receptors in young healthy human subjects
@@ -28,7 +28,7 @@ Can we identify TEP component which changes in correlation with MEP change?_
 _Question 3:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?
 What are the similarities = changes that can be attributed in general to GABAA activation?_
 
-###Experimental protocol
+Experimental protocol
 ------------------------------------------------------------
 Datasets for each subject:
 - young controls: 2 drug sessions --> alprazolam (Xanax 1mg) + placebo (zyrtec)
@@ -56,7 +56,7 @@ EMG:
 - Visor2 MobiEMG amplifier
 - SR 1024 Hz
 
-###Data analysis
+Data analysis
 ------------------------------------------------------------
 There were several types of data collected within the project and analysed using different approaches. In addition,
 resting motor threshold (rMT) and subjective vigilance assessment were included in outcome variables.  
@@ -97,10 +97,10 @@ are available in the repository as following word documents:
 - GABA-AD_PROTOCOL_TMS-EMG
 
 ------------------------------------------------------------
-##AVAILABLE SCRIPTS & FUNCTIONS
+AVAILABLE SCRIPTS & FUNCTIONS
 ------------------------------------------------------------
 
-###RS-EEG
+RS-EEG
 ------------------------------------------------------------
 preprocessing:
 - GABA_rsEEG_preprocessing1.m
@@ -116,7 +116,7 @@ RS-EEG analysis:
 - GABA_rsEEG_visualization.m
 
 
-###EEG: TEPs from M1 and AG
+EEG: TEPs from M1 and AG
 ------------------------------------------------------------
 import:
 - GABA_EEG_import.m
@@ -137,7 +137,7 @@ TEP analysis:
 - GABA_EEG_topoplot.m
 
 
-###EMG: MEPs from M1
+EMG: MEPs from M1
 ------------------------------------------------------------
 import:
 - GABA_EMG_import.m
@@ -147,7 +147,7 @@ preprocessing + MEP analysis:
 - GABA_EMG_process.m
 
 
-###Group analysis & statistics
+Group analysis & statistics
 ------------------------------------------------------------
 - GABA_group_analysis.m
 - correlation_preview.m
