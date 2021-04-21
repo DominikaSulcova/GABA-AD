@@ -2,15 +2,16 @@
 PhD project
 
 ------------------------------------------------------------
-PROJECT DESCRIPTION
+##PROJECT DESCRIPTION
 ------------------------------------------------------------
 
-Experimental questions
+###Experimental questions
 ------------------------------------------------------------
 The aims of the project are:
 1)  to characterize the inhibitory neurotransmission mediated by GABA A receptors in young healthy human subjects
     using TMS-EEG/EMG and resting state EEG (RS-EEG)
-2)  to identify EEG/EMG biomarkers most suited to assess the state of GABAergic neurotransmission for future
+2)  to identify EEG/EMG biomarkers most suited to assess the state of GABAergic neurotransmission for future comparison of
+    patient groups
 
 Two different types of GABAA-mediated inhibition were investigated:
 1)  tonic global activation of the GABAergic inhibitory system induced by GABA A receptor stimulation with benzodiazepines
@@ -18,8 +19,16 @@ Two different types of GABAA-mediated inhibition were investigated:
 2)  local phasic GABA A activation induced by sub-threshold conditioning TMS pulse (CS) preceding the testing stimulus (TS)
     --> short-latency intracortical inhibition (SICI) = amplitude reduction of TEPs and MEPs
 
+_**Question 1: Does alprazolam change the outcome measures?**
+= Is there a time-related change that can be only observable after alprazolam, and not placebo?_
 
-Experimental protocol
+_**Question 2: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
+Can we identify TEP component which changes in correlation with MEP change?_
+
+_Question 3:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?
+What are the similarities = changes that can be attributed in general to GABAA activation?_
+
+###Experimental protocol
 ------------------------------------------------------------
 Datasets for each subject:
 - young controls: 2 drug sessions --> alprazolam (Xanax 1mg) + placebo (zyrtec)
@@ -47,7 +56,7 @@ EMG:
 - Visor2 MobiEMG amplifier
 - SR 1024 Hz
 
-Data analysis
+###Data analysis
 ------------------------------------------------------------
 There were several types of data collected within the project and analysed using different approaches. In addition,
 resting motor threshold (rMT) and subjective vigilance assessment were included in outcome variables.  
@@ -88,10 +97,10 @@ are available in the repository as following word documents:
 - GABA-AD_PROTOCOL_TMS-EMG
 
 ------------------------------------------------------------
-AVAILABLE SCRIPTS & FUNCTIONS
+##AVAILABLE SCRIPTS & FUNCTIONS
 ------------------------------------------------------------
 
-RS-EEG
+###RS-EEG
 ------------------------------------------------------------
 preprocessing:
 - GABA_rsEEG_preprocessing1.m
@@ -107,7 +116,7 @@ RS-EEG analysis:
 - GABA_rsEEG_visualization.m
 
 
-EEG: TEPs from M1 and AG
+###EEG: TEPs from M1 and AG
 ------------------------------------------------------------
 import:
 - GABA_EEG_import.m
@@ -128,7 +137,7 @@ TEP analysis:
 - GABA_EEG_topoplot.m
 
 
-EMG: MEPs from M1
+###EMG: MEPs from M1
 ------------------------------------------------------------
 import:
 - GABA_EMG_import.m
@@ -138,7 +147,7 @@ preprocessing + MEP analysis:
 - GABA_EMG_process.m
 
 
-Group analysis & statistics
+###Group analysis & statistics
 ------------------------------------------------------------
 - GABA_group_analysis.m
 - correlation_preview.m
