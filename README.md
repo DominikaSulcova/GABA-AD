@@ -26,9 +26,9 @@ _**Question 2: Are some of the alprazolam-induced changes in outcome measures si
 = Is there a difference between effects observed in M1 and AG TEPs?_
 
 _**Question 3: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
-Can we identify TEP component which changes in correlation with MEP change?_
+Can we identify TEP component(s) that predict the MEP SICI (change in MEP amplitude)?_
 
-_Question 4:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?
+_**Question 4:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?**
 What are the similarities = changes that can be attributed in general to GABAA activation?_
 
 Experimental protocol
