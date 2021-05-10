@@ -108,25 +108,13 @@ if ~exist('GABA_results.mat')
         GABA_results(p).session(1).rmt.pre = params{p, 'zyrtec_rMT_pre'}; 
         GABA_results(p).session(1).rmt.post = params{p, 'zyrtec_rMT_post'}; 
         GABA_results(p).session(1).rmt.change = params{p, 'zyrtec_rMT_post'} - params{p, 'xanax_rMT_pre'}; 
-        for a = 1:3 
-            if strcmp(class(params{p, 14 + a}), 'cell')
-                GABA_results(p).session(1).vigilance(a) = 0;                    % 0 = missing value
-            else
-                GABA_results(p).session(1).vigilance(a) = params{p, 14 + a};
-            end
-        end
+        GABA_results(p).session(1).vigilance(a) = params{p, 14 + a};
 
         GABA_results(p).session(2).medication = 'alprazolam';
         GABA_results(p).session(2).rmt.pre = params{p, 'xanax_rMT_pre'}; 
         GABA_results(p).session(2).rmt.post = params{p, 'xanax_rMT_post'}; 
         GABA_results(p).session(2).rmt.change = params{p, 'xanax_rMT_post'} - params{p, 'xanax_rMT_pre'}; 
-        for a = 1:3 
-            if strcmp(class(params{p, 7 + a}), 'cell')
-                GABA_results(p).session(2).vigilance(a) = 0;
-            else
-                GABA_results(p).session(2).vigilance(a) = params{p, 7 + a};
-            end
-        end
+        GABA_results(p).session(2).vigilance(a) = params{p, 7 + a};
     end
 else
     load('GABA_results.mat')
@@ -135,15 +123,19 @@ end
 %% 2) extract TEP measures
 % fill in TEP related info
 for p = 1:length(participant)
-    GABA_results(p).TEP(1).medication = 'placebo';
-    GABA_results(p).TEP(1).ICA.pre = params{p, 'zyrtec_ICA_pre'};
-    GABA_results(p).TEP(1).ICA.post = params{p, 'zyrtec_ICA_post'};
-    
-    GABA_results(p).TEP(2).medication = 'alprazolam';
-    GABA_results(p).TEP(2).ICA.pre = params{p, 'xanax_ICA_pre'};
-    GABA_results(p).TEP(2).ICA.post = params{p, 'xanax_ICA_post'};
+%     GABA_results(p).TEP(1).medication = 'placebo';
+%     GABA_results(p).TEP(1).ICA.pre = params{p, 'zyrtec_ICA_pre'};
+%     GABA_results(p).TEP(1).ICA.post = params{p, 'zyrtec_ICA_post'};
+      GABA_results(p).TEP(1).epochs.pre(:) = squeeze(epochs(p, 1, 1, :))';
+      GABA_results(p).TEP(1).epochs.post(:) = squeeze(epochs(p, 1, 2, :))';
+      
+%     GABA_results(p).TEP(2).medication = 'alprazolam';
+%     GABA_results(p).TEP(2).ICA.pre = params{p, 'xanax_ICA_pre'};
+%     GABA_results(p).TEP(2).ICA.post = params{p, 'xanax_ICA_post'};
+      GABA_results(p).TEP(2).epochs.pre(:) = squeeze(epochs(p, 2, 1, :))';
+      GABA_results(p).TEP(2).epochs.post(:) = squeeze(epochs(p, 2, 2, :))';
 end
-clear params
+clear params epochs
 
 % mean peak amplitudes and latencies
 load('TEPs_final.mat')
@@ -311,7 +303,7 @@ for p = 1:length(participant)
 end
 clear ACC ACC_change statement
 
-% spectral exponent beta 
+% spectral exponent  
 load('rsEEG_spect_exp.mat');
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -343,6 +335,17 @@ for p = 1:length(participant)
 end
 clear spect_exp SE_i SE_change_i data_pre statement
 clear a c f m p t
+
+% alpha attenuation coeficient
+load('BI.mat'); 
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        GABA_results(p).rsEEG(m).BI.bands = {'low beta 1' 'high beta 2' 'broad beta'};
+        GABA_results(p).rsEEG(m).BI.open = squeeze(BI(m, 1, :, p)); 
+        GABA_results(p).rsEEG(m).BI.closed = squeeze(BI(m, 2, :, p)); 
+    end
+end
+clear BI p m
 
 % save
 save('GABA_results.mat', 'GABA_results')
@@ -414,9 +417,54 @@ clear p m s t
 % save
 save('GABA_results.mat', 'GABA_results')
 
-%% 5) TEP x RS-EEG correlation
+%% 5) calculate mean values
+for m = 1:length(medication)
+    for t = 1:length(time)
+        if t == 1
+            timepoint = 'pre';
+        else
+            timepoint = 'post';
+        end
+            
+        % rMT
+        for p = 1:length(participant)
+            statement = ['data(p) = GABA_results(p).session(m).rmt.' timepoint ';'];
+            eval(statement)
+        end        
+        rMT(m, t, 1) = mean(data);
+        rMT(m, t, 2) = std(data);
+        
+        % TEP epochs
+        for s = 1:length(stimulus)
+            for p = 1:length(participant)                
+                statement = ['data(p) = GABA_results(p).TEP(m).epochs.' timepoint '(s);'];
+                eval(statement)
+            end 
+            TEP_epochs(m, t, s, 1) = mean(data);
+            TEP_epochs(m, t, s, 2) = std(data);
+        end 
+        
+        % TEP ICA
+        for p = 1:length(participant)                
+            statement = ['data(p) = GABA_results(p).TEP(m).ICA.' timepoint ';'];
+            eval(statement)
+        end 
+        TEP_ICA(m, t, 1) = mean(data);
+        TEP_ICA(m, t, 2) = std(data);
+        
+
+        
+        % MEP epochs
+    end
+end
+clear m t p s timepoint statement data
+
+% save average values 
+save('GABA_average.mat', 'rMT', 'TEP_ICA', 'TEP_epochs')
+
+%% 6) TEP x RS-EEG correlation
 % parameters
-varnames = [peaks, {'AAC' 'SEo' 'SEc'}];
+varnames = [peaks, {'AAC' 'SEo' 'SEc' 'BIo' 'BIc'}];
 
 % ----- extract data -----
 for m = 1:length(medication)
@@ -438,6 +486,12 @@ for m = 1:length(medication)
         for p = 1:numel(GABA_results)            
             data_cor(m, s, p, k+2) = GABA_results(p).rsEEG(m).SE.change.open(1);   
             data_cor(m, s, p, k+3) = GABA_results(p).rsEEG(m).SE.change.closed(1);  
+        end
+        
+        % BI - lower beta
+        for p = 1:numel(GABA_results)            
+            data_cor(m, s, p, k+4) = GABA_results(p).rsEEG(m).BI.open(1);    
+            data_cor(m, s, p, k+5) = GABA_results(p).rsEEG(m).BI.closed(1); 
         end
     end
 end
@@ -462,7 +516,7 @@ clear m s fig figure_name
 
 % ----- significant linear correlation: sessions separately -----
 for m = 1:length(medication)
-    for s = [1 2]           
+    for s = [1 2]          
         % select the data                
         mat_cor = squeeze(data_cor(m, s, :, :));
         
@@ -476,7 +530,7 @@ for m = 1:length(medication)
             data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
             
             % choose only correlations that show TEP-MEP interactions
-            if ismember(col(a), 6:8)            
+            if ismember(col(a), 6:10)            
                 % plot data + regression line
                 fig = figure(figure_counter);
                 hold on
@@ -533,7 +587,7 @@ clear m s fig figure_name
 
 % ----- significant non-linear correlation: sessions separately -----
 for m = 1:length(medication)
-    for s = [1 2]           
+    for s = 2          
         % select the data                
         mat_cor = squeeze(data_cor(m, s, :, :));
         
@@ -552,7 +606,7 @@ for m = 1:length(medication)
             data_model = fitlm(mat_cor(:, row(a)), mat_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
             
             % choose only correlations that show TEP-MEP interactions
-            if ismember(col(a), 6:8)            
+            if ismember(col(a), 6:10)            
                 % plot data + regression line
                 fig = figure(figure_counter);
                 hold on
@@ -591,7 +645,7 @@ end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m s a  
 
 
-%% 6) TEP x MEP correlation
+%% 7) TEP x MEP correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -723,7 +777,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 7) TEP SICI x MEP SICI correlation
+%% 8) TEP SICI x MEP SICI correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -856,7 +910,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 8) TEP change x TEP SICI correlation
+%% 9) TEP change x TEP SICI correlation
 % parameters
 for a = 1:length(peaks)
     peaks_SICI{a} = [peaks{a}, ' SICI'];
