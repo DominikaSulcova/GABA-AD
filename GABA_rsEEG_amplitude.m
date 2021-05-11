@@ -969,4 +969,101 @@ for a = 1:length(alpha_fbands)
     figure_counter = figure_counter + 1;        
 end
 
+%% 9) beta increase  
+% ----- extract BI -----
+% choose data - individual beta subbands + broad beta band
+beta_fbands = {'beta1' 'beta2'};
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for c = 1:length(condition)
+            for b = 1:length(beta_fbands)
+                % extract amplitude of individual alpha sub-bands
+                rows = (categorical(fband_amplitude.medication) == medication{m} & ...
+                    categorical(fband_amplitude.time) == time{t} & ...
+                    categorical(fband_amplitude.condition) == condition{c} & ...
+                    categorical(fband_amplitude.fband) == beta_fbands{b});
+                data_bi(m, t, c, b, :) = fband_amplitude{rows, 'occipital'};
+            end
+            
+            % calculate broad band alpha amplitude
+            for p = 1:length(participant)
+                data_bi(m, t, c, b+1, p) =  sum(data_bi(m, t, c, [1:b], p));
+            end
+        end
+    end 
+end
+% update alpha bands
+beta_fbands = [beta_fbands, {'broad'}];
+beta_fbands_txt = {'low beta 1' 'high beta 2' 'broad beta'};
 
+% calculate BI
+for m = 1:length(medication)
+    % calculate individual BI
+    for c = 1:length(condition)
+        for b = 1:length(beta_fbands)
+            for p = 1:length(participant)
+                BI(m, c, b, p) = squeeze(data_bi(m, 2, c, b, p)) / squeeze(data_bi(m, 1, c, b, p)) * 100;
+            end
+        end
+    end
+end
+save('BI.mat', 'BI')
+
+% ----- plot box + scatter plot -----
+% BI - for each beta band separately
+for a = 1:length(beta_fbands)
+    for c = 1:length(condition)
+        % choose the data
+        data_visual = [];
+        for m = 1:length(medication)
+            data_i = squeeze(BI(m, c, a, :));
+            data_visual = cat(2, data_visual, data_i);
+        end
+
+        % plot group boxplot
+        col = colours2([2 4], :);
+        fig = figure(figure_counter);        
+        boxplot(data_visual, 'color', col)
+        hold on
+
+        % add zero line
+        xl = get(gca, 'xlim');
+        h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
+        hold on
+
+        % plot the lines
+        for p = 1:length(participant)
+            p_open(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+                'Color', [0.75, 0.75, 0.75],...
+                'MarkerSize', 10,...
+                'MArkerEdge', 'none');
+            hold on
+        end
+
+        % plot the markers
+        for b = 1:size(data_visual, 2)
+            scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+                75, col(b, :), 'filled');
+            hold on
+        end
+
+        % add parameters
+        figure_title = ['Beta increase - eyes ' condition{c} ' - ' beta_fbands_txt{a}];
+        figure_name = ['rsEEG_BI_' condition{c} '_' beta_fbands{a}];
+        yl = get(gca, 'ylim');
+        set(gca, 'xtick', [1 2], 'xticklabel', {'placebo' 'alprazolam'})
+        set(gca, 'Fontsize', 16)
+        title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+        xlabel('medication'); ylabel('amplitude increase (% baseline)');
+        ylim([yl(1), yl(2)])
+        hold off
+
+        % save the figure
+        pause(5)        
+        savefig([figure_name '.fig'])
+        saveas(fig, [figure_name '.png'])
+
+        % update the counter
+        figure_counter = figure_counter + 1;      
+    end
+end
