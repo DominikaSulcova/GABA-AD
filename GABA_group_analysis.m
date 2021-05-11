@@ -22,9 +22,11 @@
 % 4) MEP
 %       - peak-to-peak amplitude 
 %       - amplitude change
+% 5) calculate mean values
+% 6) export data for R
 % 
 % ----- CORRELATIONS -----
-% 5) TEP x RS-EEG correlation
+% 7) TEP x RS-EEG correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - change in amplitude for all TEP peaks 
 %           - change in AAC - only high alpha 3
@@ -35,7 +37,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 6) TEP x MEP correlation
+% 8) TEP x MEP correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - change in amplitude for all TEP peaks 
 %           - change in MEP peak-to-peak amplitude
@@ -43,7 +45,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 7) TEP SICI x MEP SICI correlation
+% 9) TEP SICI x MEP SICI correlation
 %       - only takes into an account data from the baseline
 %       - calculates correlation coefficients and p-values for following variables:
 %           - baseline SICI for all TEP peaks 
@@ -52,7 +54,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 8) TEP SICI x TEP change correlation
+% 10) TEP SICI x TEP change correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - baseline SICI for all TEP peaks 
 %           - change in TS TEP amplitude caused by the medication 
@@ -462,7 +464,64 @@ clear m t p s timepoint statement data
 % save average values 
 save('GABA_average.mat', 'rMT', 'TEP_ICA', 'TEP_epochs')
 
-%% 6) TEP x RS-EEG correlation
+%% 6) export data for R
+% pharmacological activation of GABAARs
+% prepare empty table
+GABA_med_long = table;
+GABA_med_long.subject = zeros(0);  GABA_med_long.medication = zeros(0); GABA_med_long.time = zeros(0); GABA_med_long.stimulus = zeros(0); 
+GABA_med_long.peak = zeros(0); GABA_med_long.TEP = zeros(0); GABA_med_long.MEP = zeros(0); 
+GABA_med_long.BI = zeros(0); GABA_med_long.ACC = zeros(0); GABA_med_long.SE = zeros(0); 
+GABA_med_long.rMT_change = zeros(0); 
+
+% cycle through entries (= rows)
+row_cnt = 1;
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            for s = [1 2]
+                for c = 1:length(peaks)
+                    % fill corresponding line:
+                    % condition info
+                    GABA_med_long.subject(row_cnt) = participant(p);             
+                    GABA_med_long.medication(row_cnt) = m - 1;
+                    GABA_med_long.time(row_cnt) = t - 1;
+                    GABA_med_long.stimulus(row_cnt) = s - 1;
+                    GABA_med_long.peak(row_cnt) = c;
+
+                    % outcome variables - TEP
+                    statement = ['GABA_med_long.TEP(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(c);'];
+                    eval(statement)
+
+                    % outcome variables - MEP
+                    switch s
+                        case 1
+                            GABA_med_long.MEP(row_cnt) = 0;
+                        case 2
+                            statement = ['GABA_med_long.MEP(row_cnt) = GABA_results(p).MEP(m).TS.' time{t} '.amplitude;'];
+                            eval(statement)
+                    end
+
+                    % outcome variables - RS-EEG
+                    GABA_med_long.BI(row_cnt) = GABA_results(p).rsEEG(m).BI.open(1); 
+                    GABA_med_long.ACC(row_cnt) = GABA_results(p).rsEEG(m).AAC.change(3); 
+                    GABA_med_long.SE(row_cnt) = GABA_results(p).rsEEG(m).SE.change.open(1);
+
+                    % rMT change
+                    GABA_med_long.rMT(row_cnt) = GABA_results(p).session(m).rmt.change;
+
+                    % update row count
+                    row_cnt = row_cnt + 1;
+                end
+            end
+        end
+    end
+end
+clear row_cnt p m s c statement 
+
+% save as CSV
+writetable(GABA_med_long, 'GABA_med_long.csv', 'Delimiter', ',');
+
+%% 7) TEP x RS-EEG correlation
 % parameters
 varnames = [peaks, {'AAC' 'SEo' 'SEc' 'BIo' 'BIc'}];
 
@@ -645,7 +704,7 @@ end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m s a  
 
 
-%% 7) TEP x MEP correlation
+%% 8) TEP x MEP correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -777,7 +836,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 8) TEP SICI x MEP SICI correlation
+%% 9) TEP SICI x MEP SICI correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -910,7 +969,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 9) TEP change x TEP SICI correlation
+%% 10) TEP change x TEP SICI correlation
 % parameters
 for a = 1:length(peaks)
     peaks_SICI{a} = [peaks{a}, ' SICI'];

@@ -3,15 +3,27 @@ title: "GABA-AD: mixed models statistics"
 output: html_notebook
 ---
 
+```{css, echo = FALSE}
+codeblock {
+  background-color: lightblue;
+  border-style: none;
+  font-color: darkblue;
+}
+output {
+  border: 2px lightblue;
+}
+```
+
 ```{r chunk_setup, include = FALSE, eval = TRUE}
 knitr::opts_chunk$set(message = F, warning = F, comment = NA, 
                       cache.rebuild = F, cache = T, R.options = list(width = 120), 
-                      fig.width = 8, fig.align = 'center')
+                      fig.width = 8, fig.align = 'center',
+                      class.source = 'success', class.output = 'output')
 ```
 
 ## Effect of pharmacological actvation on outcome variables
 ### Outcome variables
-- TEPs: 5 components (= amplitudes)
+- TEPs: 5 components (peaks) --> mean amplitude in 
 - MEPs: only 1 amplitude 
 - RS-EEG: 3 related variables
 
@@ -25,16 +37,9 @@ knitr::opts_chunk$set(message = F, warning = F, comment = NA,
 - Session --> intra-personal variability
 - Stimulus --> only for TEPs, to cover for the fact that all TEP components are related
 
-
-## Questions for Mme Bugli
-- Shall I calculate with differences or should I make factor TIME: pre X post
-- How do I add rMT as covariate?
-  - rMT change --> to correct for changing of rMT
-  - rMT --> to correct for variable intensity in stimulation = variable peripheral effects
-
 ## Statistical pipeline
 Load packages
-```{r basic_packages}
+```{r basic_packages, echo = TRUE, include = FALSE}
 library(tidyverse)
 library(lme4)
 library(car)
@@ -53,10 +58,10 @@ library(readr)
 
 
 Import data in R-compatible long format
-```{r}
-setwd('E:/UCL/O365G-NOCIONS - People/dsulcova/GABA-AD_results/Data')
-data = read.csv('GABA_med_long.csv')
-head(data, 10)
+```{r load_data}
+filename = file.choose()
+data = read.csv(filename)
+head(data, 20)
 ```
 
  
