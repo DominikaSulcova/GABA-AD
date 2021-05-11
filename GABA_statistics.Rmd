@@ -13,7 +13,7 @@ knitr::opts_chunk$set(message = F, warning = F, comment = NA,
 ### Outcome variables
 - TEPs: 5 components (= amplitudes)
 - MEPs: only 1 amplitude 
-- RS-EEG: 4 related variables
+- RS-EEG: 3 related variables
 
 ### Factors
 - MEDICATION: alprazolam X placebo
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(message = F, warning = F, comment = NA,
 - STIMULUS: CS X TS
 
 ### Group by
-- Participant --> individual (inter-personal) variability
+- Participant --> individual (inter-personal) variability --> participant RE
 - Session --> intra-personal variability
 - Stimulus --> only for TEPs, to cover for the fact that all TEP components are related
 
