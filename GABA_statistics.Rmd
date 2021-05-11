@@ -1,0 +1,57 @@
+---
+title: "GABA-AD: mixed models statistics"
+output: html_notebook
+---
+
+```{r chunk_setup, include = FALSE, eval = TRUE}
+knitr::opts_chunk$set(message = F, warning = F, comment = NA, 
+                      cache.rebuild = F, cache = T, R.options = list(width = 120), 
+                      fig.width = 8, fig.align = 'center', dev = 'svglite',
+                      dev.args = list(bg = 'blue', bty = 'transparent', col = 'darkblue', cex = 11))
+```
+
+## Effect of pharmacological actvation on outcome variables
+### Outcome variables
+- TEPs: 5 components (= amplitudes)
+- MEPs: only 1 amplitude 
+- RS-EEG: 4 related variables
+
+### Factors
+- MEDICATION: alprazolam X placebo
+- TIME: baseline X post medication
+- STIMULUS: CS X TS
+
+### Group by
+- Participant --> individual (inter-personal) variability
+- Session --> intra-personal variability
+- Stimulus --> only for TEPs, to cover for the fact that all TEP components are related
+
+
+## Questions for Mme Bugli
+- Shall I calculate with differences or should I make factor TIME: pre X post
+- How do I add rMT as covariate?
+  - rMT change --> to correct for changing of rMT
+  - rMT --> to correct for variable intensity in stimulation = variable peripheral effects
+
+## Statistical pipeline
+Load packages
+```{r basic_packages}
+library(lme4)
+library(car)
+library(ggplot2)
+library(MASS)
+library(dplyr)
+library(ggpubr)
+library(corrplot) 
+library(visreg) 
+library(rgl)
+library(knitr)
+library(scatterplot3d)
+library(merTools)
+```
+
+
+Import data in R-compatible long format
+```{r}
+paste(c('Stats', 'suck'))
+```
