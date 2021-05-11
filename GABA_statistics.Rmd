@@ -6,8 +6,7 @@ output: html_notebook
 ```{r chunk_setup, include = FALSE, eval = TRUE}
 knitr::opts_chunk$set(message = F, warning = F, comment = NA, 
                       cache.rebuild = F, cache = T, R.options = list(width = 120), 
-                      fig.width = 8, fig.align = 'center', dev = 'svglite',
-                      dev.args = list(bg = 'blue', bty = 'transparent', col = 'darkblue', cex = 11))
+                      fig.width = 8, fig.align = 'center')
 ```
 
 ## Effect of pharmacological actvation on outcome variables
@@ -36,6 +35,7 @@ knitr::opts_chunk$set(message = F, warning = F, comment = NA,
 ## Statistical pipeline
 Load packages
 ```{r basic_packages}
+library(tidyverse)
 library(lme4)
 library(car)
 library(ggplot2)
@@ -48,10 +48,19 @@ library(rgl)
 library(knitr)
 library(scatterplot3d)
 library(merTools)
+library(readr)
 ```
 
 
 Import data in R-compatible long format
 ```{r}
-paste(c('Stats', 'suck'))
+setwd('E:/UCL/O365G-NOCIONS - People/dsulcova/GABA-AD_results/Data')
+data = read.csv('GABA_med_long.csv')
+head(data, 10)
+```
+
+ 
+```{r}
+
+
 ```
