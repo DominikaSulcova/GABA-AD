@@ -1,15 +1,17 @@
 ---
-title: "GABA-AD: mixed models statistics"
-output: html_notebook
+title: 'GABA-AD: mixed models statistics'
+output: 
+  html_notebook:
+    theme: yeti
 ---
 
 ```{css, echo = FALSE}
-codeblock {
+.codeblock {
   background-color: lightblue;
   border-style: none;
   font-color: darkblue;
 }
-output {
+.output {
   border: 2px lightblue;
 }
 ```
@@ -18,13 +20,14 @@ output {
 knitr::opts_chunk$set(message = F, warning = F, comment = NA, 
                       cache.rebuild = F, cache = T, R.options = list(width = 120), 
                       fig.width = 8, fig.align = 'center',
-                      class.source = 'success', class.output = 'output')
+                      class.source = 'codeblock', class.output = 'output')
 ```
 
 ## Effect of pharmacological actvation on outcome variables
 ### Outcome variables
-- TEPs: 5 components (peaks) --> mean amplitude in 
-- MEPs: only 1 amplitude 
+Each type of variable will be tested as output to 
+- TEPs: 5 components (peaks P30, N45, P60, N100, P180) --> mean amplitude 
+- MEPs: peak-to-peak amplitude 
 - RS-EEG: 3 related variables
 
 ### Factors
@@ -58,7 +61,7 @@ library(readr)
 
 
 Import data in R-compatible long format
-```{r load_data}
+```{r load_data, class.output = 'success'}
 filename = file.choose()
 data = read.csv(filename)
 head(data, 20)
