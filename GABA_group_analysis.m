@@ -15,10 +15,10 @@
 % 3) RS-EEG
 %       - dataset info --> ICs, epochs etc.
 %       - data parameters --> IAF, TF, fbands 
-%       - mean amplitude over fbands
-%       - amplitude change
+%       - mean amplitude over fbands + amplitude change
 %       - alpha attenuation coeficient
-%       - spectral exponent beta 
+%       - spectral exponent 
+%       - broad beta amplitude over central region + change    
 % 4) MEP
 %       - peak-to-peak amplitude 
 %       - amplitude change
@@ -338,16 +338,21 @@ end
 clear spect_exp SE_i SE_change_i data_pre statement
 clear a c f m p t
 
-% alpha attenuation coeficient
-load('BI.mat'); 
+% broad beta 
+load('beta.mat'); load('beta_change.mat');
 for p = 1:length(participant)
     for m = 1:length(medication)
-        GABA_results(p).rsEEG(m).BI.bands = {'low beta 1' 'high beta 2' 'broad beta'};
-        GABA_results(p).rsEEG(m).BI.open = squeeze(BI(m, 1, :, p)); 
-        GABA_results(p).rsEEG(m).BI.closed = squeeze(BI(m, 2, :, p)); 
+        for t = 1:length(time)
+            % beta
+            statement = ['GABA_results(p).rsEEG(m).beta.' time{t} '(1, :) = squeeze(beta(m, t, p));'];
+            eval(statement)            
+        end
+        
+        % beta change = normalized
+        GABA_results(p).rsEEG(m).beta.change(1, :) = squeeze(beta_change(m, p));     
     end
 end
-clear BI p m
+clear beta beta_change p m
 
 % save
 save('GABA_results.mat', 'GABA_results')
@@ -523,7 +528,7 @@ writetable(GABA_med_long, 'GABA_med_long.csv', 'Delimiter', ',');
 
 %% 7) TEP x RS-EEG correlation
 % parameters
-varnames = [peaks, {'AAC' 'SEo' 'SEc' 'BIo' 'BIc'}];
+varnames = [peaks, {'AAC' 'SEo' 'SEc' 'beta'}];
 
 % ----- extract data -----
 for m = 1:length(medication)
@@ -547,10 +552,9 @@ for m = 1:length(medication)
             data_cor(m, s, p, k+3) = GABA_results(p).rsEEG(m).SE.change.closed(1);  
         end
         
-        % BI - lower beta
+        % broad beta 
         for p = 1:numel(GABA_results)            
-            data_cor(m, s, p, k+4) = GABA_results(p).rsEEG(m).BI.open(1);    
-            data_cor(m, s, p, k+5) = GABA_results(p).rsEEG(m).BI.closed(1); 
+            data_cor(m, s, p, k+4) = GABA_results(p).rsEEG(m).beta.change;     
         end
     end
 end
