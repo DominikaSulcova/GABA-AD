@@ -1,4 +1,5 @@
-%% parameters
+function track_peaks()
+%% default parameters
 clear all; clc;
 
 % dataset
@@ -187,4 +188,5 @@ for k = 2:length(peaks)
             end
         end
     end
+end
 end

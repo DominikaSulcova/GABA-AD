@@ -261,7 +261,7 @@ for s = 1:length(stimulus)
         end
         
     else
-        GABA_TEP(s).latencies = gmfp_plot(x, gmfp, time_window, xstep, labeled);
+        GABA_TEP(s).latencies = gmfp_plot(x, GABA_GMFP(s, :), time_window, xstep, labeled);
     end  
     hold off
 
@@ -823,5 +823,4 @@ if xCursor >= minx && xCursor <= maxx && yCursor >= miny && yCursor <= maxy
 end
 end
 end
-
 
