@@ -28,8 +28,16 @@
 % 6) Extracts mean amplitude values 
 %       - separately from all frequency bands (=TOIs) and all ROIs
 %       --> saves as table - 'fband_amplitude.mat'; 'fband_amplitude.csv'
-% 7) Plots barplots with mean amplitudes for each ROI
-% 8) Calculates alpha attenuation coefficient (AAC)
+% 7) Plots mean amplitudes 
+%       - barplots for each ROI
+%       - normalizes amplitudes to baseline = change in %
+%       - line plot for each frequency subband --> visual identification of
+%       effect of the medication
+% 8) Extracts beta band amplitude
+%       - plots changes in broad beta mean amplitude
+%       - ROI: central region, TOI: broad band beta (beta1 + beta2)
+%       --> saves values as 'beta.mat' 
+% 9) Calculates alpha attenuation coefficient (AAC)
 %       - for individual alpha subbands + broad alpha band
 %       - calculates individual AAC and AAC change 
 %       - plots box + scatter plots, saves figures
@@ -748,9 +756,10 @@ for m = 1:length(medication)
         end
     end
 end
+clear m t c r f 
 disp(['Datasize: ' num2str(size(avg_amp))])
 
-% plot by region
+% barplots - plot by region
 for r = 1:numel(ROI)
     for c = 1:length(condition)
         % choose data
@@ -759,9 +768,11 @@ for r = 1:numel(ROI)
         
         % launch the figure
         fig = figure(figure_counter);
-        barplot = bar(data_visual', 'EdgeColor', 'none');
-        colormap(colours2)
         hold on
+        barplot = bar(data_visual', 'EdgeColor', 'none');
+        for a = 1:size(data_visual, 1)
+            barplot(a).FaceColor = colours2(a, :)
+        end
         
         % plot errorbars
         ngroups = numel(TOI);
@@ -770,7 +781,6 @@ for r = 1:numel(ROI)
         for i = 1:nbars
             x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
             errorbar(x, data_visual(i, :), [], sem_visual(i, :), 'k', 'linestyle', 'none');
-            hold on
         end        
         
         % set other parameters
@@ -778,7 +788,7 @@ for r = 1:numel(ROI)
         title(fig_name, 'FontWeight', 'bold', 'FontSize', 18)
         legend(barplot, {'placebo - baseline', 'placebo - post med', 'alprazolam - baseline', 'alprazolam - post med'}, 'Location', 'northeast', 'fontsize', 16)
         xlabel('frequency band')
-        ylabel('relative amplitude (µV)')
+        ylabel('relative amplitude (\muV)')
         set(gca, 'xtick', 1:numel(TOI), 'xticklabel', {TOI.band})
         set(gca, 'Fontsize', 16)
         hold off
@@ -796,10 +806,200 @@ for r = 1:numel(ROI)
         figure_counter = figure_counter + 1;
     end
 end
+clear r c fig fig_name ngroups nbars groupwidth fig barplot data_visual sem_visual
 
-clear data_visual sem_visual
+% normalize amplitude to baseline
+for m = 1:length(medication)
+    for c = 1:length(condition)
+        for r = 1:numel(ROI)
+            for f = 1:numel(TOI)
+                for p = 1:length(participant)
+                    amp_baseline = fband_amplitude.(5 + r)(strcmp(fband_amplitude.medication, medication{m}) & ... 
+                        strcmp(fband_amplitude.time, time{1}) & ... % choose time pre medication
+                        strcmp(fband_amplitude.condition, condition{c}) & ...
+                        strcmp(fband_amplitude.fband, TOI(f).band) & ...
+                        fband_amplitude.subject == participant(p));
+                    amp_raw = fband_amplitude.(5 + r)(strcmp(fband_amplitude.medication, medication{m}) & ... 
+                        strcmp(fband_amplitude.time, time{2}) & ... % choose time post medication
+                        strcmp(fband_amplitude.condition, condition{c}) & ...
+                        strcmp(fband_amplitude.fband, TOI(f).band) & ...
+                        fband_amplitude.subject == participant(p));
+                    amp_norm(m, c, r, f, p) = amp_raw / amp_baseline * 100;
+                end
+            end
+        end
+    end
+end
+clear m c r f p amp_baseline amp_raw
 
-%% 8) alpha attenuation coeficient  
+% plot relative amplitude by fband
+for f = 1:numel(TOI)
+    for c = 1:length(condition)
+        % choose data
+        data_visual = squeeze(amp_norm(:, c, :, f, :));
+       
+        % launch the figure
+        fig = figure(figure_counter);
+        hold on
+        
+        % add no-change line
+        xlim([0.75 size(data_visual, 2) + 0.25])
+        line([0.75 size(data_visual, 2) + 0.25], [100, 100], 'Color', [0.75 0.75 0.75], ...
+            'LineStyle', '--', 'LineWidth', 2);
+                              
+        % plot data with errorbars
+        x = 1:size(data_visual, 2);    
+        for m = 1:size(data_visual, 1)  % medication
+            % calculate the data and 95% CI
+            for r = 1:size(data_visual, 2); % ROIs  
+                y(r) = mean(squeeze(data_visual(m, r, :)));
+                CI(r) = std(squeeze(data_visual(m, r, :))) / sqrt(length(participant)) * z;
+            end
+
+            % plot
+            err(m) = errorbar(x, y, CI)
+
+            % add parameters
+            err(m).Color = colours2((m - 1)*2 + 2, :);
+            err(m).LineWidth = 1.2;
+            err(m).Marker = 'o';
+            err(m).MarkerFaceColor = colours2((m - 1)*2 + 2, :);
+            err(m).MarkerSize = 10;
+        end
+        
+        % set other parameters
+        fig_name = [TOI(f).band ' frequency band, eyes ' condition{c}];
+        title(fig_name, 'FontWeight', 'bold', 'FontSize', 16)
+        set(gca, 'Fontsize', 14)
+        legend(err, medication, 'Location', 'northeast', 'fontsize', 14, 'EdgeColor', 'none')
+        xlabel('region of interest')
+        set(gca, 'xtick', 1:size(data_visual, 2), 'xticklabel', {'frontal' 'central' 'left' 'right' 'occipital'})
+        ylabel('relative amplitude (% baseline)')
+        hold off
+        
+        % wait for size adjustment for PNG
+        disp('Time to change the figure size, if necessary.')
+        pause(2)
+
+        % save figure
+        fig_name = ['rsEEG_change_' TOI(f).band '_' condition{c}];
+        savefig([fig_name '.fig'])
+        saveas(fig, [fig_name '.png'])
+        
+        % update counter
+        figure_counter = figure_counter + 1;
+    end
+end
+clear f c m r x y CI err fig fig_name data_visual sem_visual amp_norm
+
+%% 8) beta band 
+% choose data
+beta_fbands = {'beta1' 'beta2'};
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for c = 1:length(condition)
+            for r = 1:numel(ROI)
+                for b = 1:length(beta_fbands)
+                    % extract amplitude of individual beta sub-bands
+                    rows = (categorical(fband_amplitude.medication) == medication{m} & ...
+                        categorical(fband_amplitude.time) == time{t} & ...
+                        categorical(fband_amplitude.condition) == condition{c} & ...
+                        categorical(fband_amplitude.fband) == beta_fbands{b});
+                    data_beta(m, t, c, r, b, :) = fband_amplitude{rows, ROI(r).area};
+                end
+            
+                % calculate broad band beta amplitude
+                for p = 1:length(participant)
+                    data_beta(m, t, c, r, b+1, p) =  sum(data_beta(m, t, c, r, [1:b], p));
+                end
+            end
+        end
+    end 
+end
+clear m t c r b rows
+disp(['Datasize: ' num2str(size(data_beta))])
+
+% normalize broad beta amplitude to baseline - only eyes open
+for m = 1:length(medication)
+    for r = 1:numel(ROI)
+        for p = 1:length(participant)
+            amp_baseline = squeeze(data_beta(m, 1, 1, r, 3, p));
+            amp_raw = squeeze(data_beta(m, 2, 1, r, 3, p));
+            amp_norm(m, r, p) = amp_raw / amp_baseline * 100;
+        end
+    end
+end
+clear m r p amp_baseline amp_raw
+
+% plot relative amplitude by fband
+% launch the figure
+fig = figure(figure_counter);
+hold on
+
+% add no-change line
+ylim([90 200])
+xlim([0.75 size(amp_norm, 2) + 0.25])
+line([0.75 size(amp_norm, 2) + 0.25], [100, 100], 'Color', [0.75 0.75 0.75], ...
+    'LineStyle', '--', 'LineWidth', 2);
+
+% plot data with errorbars
+x = 1:size(amp_norm, 2);    
+for m = 1:size(amp_norm, 1)  % medication
+    % calculate the data and 95% CI
+    for r = 1:size(amp_norm, 2); % ROIs  
+        y(r) = mean(squeeze(amp_norm(m, r, :)));
+        CI(r) = std(squeeze(amp_norm(m, r, :))) / sqrt(length(participant)) * z;
+    end
+
+    % plot
+    err(m) = errorbar(x, y, CI);
+
+    % add parameters
+    err(m).Color = colours2((m - 1)*2 + 2, :);
+    err(m).LineWidth = 1.2;
+    err(m).Marker = 'o';
+    err(m).MarkerFaceColor = colours2((m - 1)*2 + 2, :);
+    err(m).MarkerSize = 10;
+end
+
+% set other parameters
+fig_name = 'Broad beta band, eyes open';
+title(fig_name, 'FontWeight', 'bold', 'FontSize', 16)
+set(gca, 'Fontsize', 14)
+legend(err, medication, 'Location', 'northeast', 'fontsize', 14, 'EdgeColor', 'none')
+xlabel('region of interest')
+set(gca, 'xtick', 1:size(amp_norm, 2), 'xticklabel', {'frontal' 'central' 'left' 'right' 'occipital'})
+ylabel('relative amplitude (% baseline)')
+hold off
+
+% save figure
+fig_name = 'rsEEG_change_beta';
+savefig([fig_name '.fig'])
+saveas(fig, [fig_name '.png'])
+
+% update counter
+figure_counter = figure_counter + 1;
+clear f c m r x y CI err fig fig_name sem_visual amp_norm 
+
+% extract broad beta --> central region, eyes open
+for m = 1:length(medication)
+    % raw beta
+    for t = 1:length(time)
+        for p = 1:length(participant)
+            beta(m, t, p) = squeeze(data_beta(m, t, 1, 2, 3, p));
+        end
+    end
+    
+    % change --> normalized beta
+    for p = 1:length(participant)
+        beta_change(m, p) = (beta(m, 2, p)/beta(m, 1, p))*100 - 100;
+    end
+end
+save('beta.mat', 'beta'); save('beta_change.mat', 'beta_change'); 
+
+clear m t p data_beta
+
+%% 9) alpha attenuation coeficient  
 % ----- extract AAC -----
 % choose data - individual alpha subbands + broad alpha band
 alpha_fbands = {'alpha1' 'alpha2' 'alpha3'};
@@ -969,101 +1169,3 @@ for a = 1:length(alpha_fbands)
     figure_counter = figure_counter + 1;        
 end
 
-%% 9) beta increase  
-% ----- extract BI -----
-% choose data - individual beta subbands + broad beta band
-beta_fbands = {'beta1' 'beta2'};
-for m = 1:length(medication)
-    for t = 1:length(time)
-        for c = 1:length(condition)
-            for b = 1:length(beta_fbands)
-                % extract amplitude of individual alpha sub-bands
-                rows = (categorical(fband_amplitude.medication) == medication{m} & ...
-                    categorical(fband_amplitude.time) == time{t} & ...
-                    categorical(fband_amplitude.condition) == condition{c} & ...
-                    categorical(fband_amplitude.fband) == beta_fbands{b});
-                data_bi(m, t, c, b, :) = fband_amplitude{rows, 'occipital'};
-            end
-            
-            % calculate broad band alpha amplitude
-            for p = 1:length(participant)
-                data_bi(m, t, c, b+1, p) =  sum(data_bi(m, t, c, [1:b], p));
-            end
-        end
-    end 
-end
-% update alpha bands
-beta_fbands = [beta_fbands, {'broad'}];
-beta_fbands_txt = {'low beta 1' 'high beta 2' 'broad beta'};
-
-% calculate BI
-for m = 1:length(medication)
-    % calculate individual BI
-    for c = 1:length(condition)
-        for b = 1:length(beta_fbands)
-            for p = 1:length(participant)
-                BI(m, c, b, p) = squeeze(data_bi(m, 2, c, b, p)) / squeeze(data_bi(m, 1, c, b, p)) * 100;
-            end
-        end
-    end
-end
-save('BI.mat', 'BI')
-
-% ----- plot box + scatter plot -----
-% BI - for each beta band separately
-for a = 1:length(beta_fbands)
-    for c = 1:length(condition)
-        % choose the data
-        data_visual = [];
-        for m = 1:length(medication)
-            data_i = squeeze(BI(m, c, a, :));
-            data_visual = cat(2, data_visual, data_i);
-        end
-
-        % plot group boxplot
-        col = colours2([2 4], :);
-        fig = figure(figure_counter);        
-        boxplot(data_visual, 'color', col)
-        hold on
-
-        % add zero line
-        xl = get(gca, 'xlim');
-        h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
-        hold on
-
-        % plot the lines
-        for p = 1:length(participant)
-            p_open(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
-                'Color', [0.75, 0.75, 0.75],...
-                'MarkerSize', 10,...
-                'MArkerEdge', 'none');
-            hold on
-        end
-
-        % plot the markers
-        for b = 1:size(data_visual, 2)
-            scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
-                75, col(b, :), 'filled');
-            hold on
-        end
-
-        % add parameters
-        figure_title = ['Beta increase - eyes ' condition{c} ' - ' beta_fbands_txt{a}];
-        figure_name = ['rsEEG_BI_' condition{c} '_' beta_fbands{a}];
-        yl = get(gca, 'ylim');
-        set(gca, 'xtick', [1 2], 'xticklabel', {'placebo' 'alprazolam'})
-        set(gca, 'Fontsize', 16)
-        title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
-        xlabel('medication'); ylabel('amplitude increase (% baseline)');
-        ylim([yl(1), yl(2)])
-        hold off
-
-        % save the figure
-        pause(5)        
-        savefig([figure_name '.fig'])
-        saveas(fig, [figure_name '.png'])
-
-        % update the counter
-        figure_counter = figure_counter + 1;      
-    end
-end
