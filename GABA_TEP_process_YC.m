@@ -385,13 +385,14 @@ buffer = 0.5;                                               % a margin of the wi
 eoi_n = 3;                                                  % number of detected EOIs
 % ------------------------------------
 
-% identify individual peaks - baseline datasets
+% check if numbers match
+if numel(seed_electrode) ~= numel(seed_peaks)
+    disp('Number of seed electrodes does not correspond to the seed peak distribution!')
+end
+
 % k = 1; p = 1; m = 1; s = 1; e = 1;
 for k = 1:length(GABA_TEP(1).peaks)
     % select seed 
-    if numel(seed_electrode) ~= numel(seed_peaks)
-        disp('Number of seed electrodes does not correspond to the seed peak distribution!')
-    end
     for a = 1:numel(seed_electrode)
         if any(seed_peaks{a} == k)
             seed = find(contains(labels, seed_electrode{a}));
@@ -821,6 +822,15 @@ if xCursor >= minx && xCursor <= maxx && yCursor >= miny && yCursor <= maxy
     TEP_topoplot(header_visual, data_visual, x, map_lims); 
     hold on
 end
+end
+function pos_x = get_position(axesHandles)
+% wait until the mouse is clicked
+w = waitforbuttonpress;
+
+% get the position of the mouse
+CP = get(axesHandles(1), 'CurrentPoint');
+pos_x = CP(1,1);
+
 end
 end
 
