@@ -25,8 +25,11 @@
 % 5) calculate mean values
 % 6) export data for R
 % 
+% ----- DESCRIPTIVE STATISTICS -----
+% 7) effect of medication 
+% 
 % ----- CORRELATIONS -----
-% 7) TEP x RS-EEG correlation
+% ) TEP x RS-EEG correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - change in amplitude for all TEP peaks 
 %           - change in AAC - only high alpha 3
@@ -37,7 +40,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 8) TEP x MEP correlation
+% ) TEP x MEP correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - change in amplitude for all TEP peaks 
 %           - change in MEP peak-to-peak amplitude
@@ -45,7 +48,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 9) TEP SICI x MEP SICI correlation
+% ) TEP SICI x MEP SICI correlation
 %       - only takes into an account data from the baseline
 %       - calculates correlation coefficients and p-values for following variables:
 %           - baseline SICI for all TEP peaks 
@@ -54,7 +57,7 @@
 %       - plots significantly correlated variables, shows regression line
 %       - checks both linear and non-linear correlation (--> Spearman coefficient)
 % 
-% 10) TEP SICI x TEP change correlation
+% ) TEP SICI x TEP change correlation
 %       - calculates correlation coefficients and p-values for following variables:
 %           - baseline SICI for all TEP peaks 
 %           - change in TS TEP amplitude caused by the medication 
@@ -76,6 +79,7 @@ time = {'pre' 'post'};
 % stats, graphics
 peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
 alpha = 0.05;
+z = 1.96;
 load('colours2.mat')
 shade = 0.2;
 figure_counter = 1;
@@ -338,18 +342,19 @@ end
 clear spect_exp SE_i SE_change_i data_pre statement
 clear a c f m p t
 
-% broad beta 
+% low beta - sigma peak
 load('beta.mat'); load('beta_change.mat');
 for p = 1:length(participant)
     for m = 1:length(medication)
+        GABA_results(p).rsEEG(m).beta.bands = {'beta 1' 'beta 2' 'broad beta'};
         for t = 1:length(time)
             % beta
-            statement = ['GABA_results(p).rsEEG(m).beta.' time{t} '(1, :) = squeeze(beta(m, t, p));'];
+            statement = ['GABA_results(p).rsEEG(m).beta.' time{t} '(1, 1:3) = squeeze(beta(m, t, p, :));'];
             eval(statement)            
         end
         
         % beta change = normalized
-        GABA_results(p).rsEEG(m).beta.change(1, :) = squeeze(beta_change(m, p));     
+        GABA_results(p).rsEEG(m).beta.change(1, 1:3) = squeeze(beta_change(m, p, :));     
     end
 end
 clear beta beta_change p m
@@ -475,8 +480,8 @@ save('GABA_average.mat', 'rMT', 'TEP_ICA', 'TEP_epochs')
 GABA_med_long = table;
 GABA_med_long.subject = zeros(0);  GABA_med_long.medication = zeros(0); GABA_med_long.time = zeros(0); GABA_med_long.stimulus = zeros(0); 
 GABA_med_long.peak = zeros(0); GABA_med_long.TEP = zeros(0); GABA_med_long.MEP = zeros(0); 
-GABA_med_long.BI = zeros(0); GABA_med_long.ACC = zeros(0); GABA_med_long.SE = zeros(0); 
-GABA_med_long.rMT_change = zeros(0); 
+GABA_med_long.beta = zeros(0); GABA_med_long.AAC = zeros(0); GABA_med_long.SE = zeros(0); 
+GABA_med_long.rMT = zeros(0); 
 
 % cycle through entries (= rows)
 row_cnt = 1;
@@ -506,13 +511,21 @@ for p = 1:length(participant)
                             eval(statement)
                     end
 
-                    % outcome variables - RS-EEG
-                    GABA_med_long.BI(row_cnt) = GABA_results(p).rsEEG(m).BI.open(1); 
-                    GABA_med_long.ACC(row_cnt) = GABA_results(p).rsEEG(m).AAC.change(3); 
-                    GABA_med_long.SE(row_cnt) = GABA_results(p).rsEEG(m).SE.change.open(1);
+                    % RS-EEG: beta 1 - sigma peak
+                    statement = ['GABA_med_long.beta(row_cnt) = GABA_results(p).rsEEG(m).beta.' time{t} '(1);'];
+                    eval(statement)
+                    
+                    % RS-EEG: AAC - broad alpha
+                    statement = ['GABA_med_long.AAC(row_cnt) = GABA_results(p).rsEEG(m).AAC.' time{t} '(4);'];
+                    eval(statement)
+                    
+                    % RS-EEG: SE - eyes open
+                    statement = ['GABA_med_long.SE(row_cnt) = GABA_results(p).rsEEG(m).SE.' time{t} '.open(1);'];
+                    eval(statement)
 
-                    % rMT change
-                    GABA_med_long.rMT(row_cnt) = GABA_results(p).session(m).rmt.change;
+                    % rMT 
+                    statement = ['GABA_med_long.rMT(row_cnt) = GABA_results(p).session(m).rmt.' time{t} ';'];
+                    eval(statement)
 
                     % update row count
                     row_cnt = row_cnt + 1;
@@ -526,7 +539,106 @@ clear row_cnt p m s c statement
 % save as CSV
 writetable(GABA_med_long, 'GABA_med_long.csv', 'Delimiter', ',');
 
-%% 7) TEP x RS-EEG correlation
+%% 7) effect of medication
+timepoint = {'1.5h' '2h' '2.5h'};
+
+% extract data
+for m = 1:length(medication)
+    for p = 1:length(participant)
+        for t = 1:length(timepoint)
+            data_med(m, p, t) = GABA_results(p).session(m).vigilance(t);
+        end
+    end
+end
+clear m p t
+
+% extract average values
+for m = 1:length(medication)
+    for t = 1:length(timepoint)
+        data_med_avg(m, t, 1) = mean(data_med(m, :, t), 'omitnan');
+        data_med_avg(m, t, 2) = std(data_med(m, :, t), 'omitnan');          % STD
+        n = sum(~isnan(data_med(m, :, t)));
+        data_med_avg(m, t, 3) = data_med_avg(m, t, 2)/sqrt(n);              % SEM
+        data_med_avg(m, t, 4) = data_med_avg(m, t, 3) * z;                  % 95% confidence interval      
+    end
+end
+clear t m n
+% pd = fitdist(data_med(1, :, 1)','Normal')
+% CI = paramci(pd);
+
+% launch the figure
+fig = figure(figure_counter);
+hold on
+
+% plot data with errorbars
+x = 1:length(timepoint);    
+for m = 1:length(medication)  
+    % plot
+    err(m) = errorbar(x, data_med_avg(m, :, 1), data_med_avg(m, :, 4));
+
+    % add parameters
+    err(m).Color = colours2((m - 1)*2 + 2, :);
+    err(m).LineWidth = 2;
+    err(m).Marker = 'o';
+    err(m).MarkerFaceColor = colours2((m - 1)*2 + 2, :);
+    err(m).MarkerSize = 10;
+end
+
+% set other parameters
+fig_name = 'Subjective arousal assessment';
+title(fig_name, 'FontWeight', 'bold', 'FontSize', 16)
+set(gca, 'Fontsize', 16)
+legend(err, medication, 'Location', 'southeast', 'fontsize', 16, 'EdgeColor', 'none')
+xlabel('timepoint')
+set(gca, 'xtick', 1:length(timepoint), 'xticklabel', timepoint)
+ylim([0 10])
+xlim([0.75 length(timepoint)+0.25])
+ax = gca; ax.YGrid = 'on';
+hold off
+clear x ax err fig fig_name m 
+
+% save figure
+fig_name = 'arousal';
+savefig([fig_name '.fig'])
+saveas(fig, [fig_name '.png'])
+
+% update counter
+figure_counter = figure_counter + 1;
+
+% ----- test for differences - rm-ANOVA -----
+% prepare data table
+data_table = table; data_table.participant = participant'; 
+for m = 1:length(medication)
+    for t = 1:length(timepoint)
+        statement = ['data_table.' medication{m} '_t' num2str(t) ' = data_med(m, :, t)'';'];
+        eval(statement)
+    end
+end
+clear m t statement 
+ 
+% within-subjects design
+wd = table([repmat(medication(1), length(timepoint), 1); repmat(medication(2), length(timepoint), 1)],...
+    [1:length(timepoint) 1:length(timepoint)]','VariableNames',{'treatment','timepoint'});
+wd.treatment = categorical(wd.treatment); wd.timepoint = categorical(wd.timepoint);
+
+% rm-ANOVA
+rm = fitrm(data_table, 'placebo_t1-alprazolam_t3~1', 'WithinDesign', wd);
+
+% check for approx. normal distribution
+figure(figure_counter)
+histogram(reshape(data_table{:,2:end},[],1), 10)
+
+% check for sphericity
+rm.mauchly
+
+% results table
+ranova(rm, 'WithinModel', 'treatment*timepoint') 
+figure(figure_counter)
+boxplot(data_table{:,2:end})
+xlabel('measurements')
+ylabel('arousal assessment')
+
+%% ) TEP x RS-EEG correlation
 % parameters
 varnames = [peaks, {'AAC' 'SEo' 'SEc' 'beta'}];
 
@@ -708,7 +820,7 @@ end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m s a  
 
 
-%% 8) TEP x MEP correlation
+%% ) TEP x MEP correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -840,7 +952,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 9) TEP SICI x MEP SICI correlation
+%% ) TEP SICI x MEP SICI correlation
 % parameters
 varnames = [peaks, {'MEP'}];
 
@@ -973,7 +1085,7 @@ for m = 1:length(medication)
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos a   
 
-%% 10) TEP change x TEP SICI correlation
+%% ) TEP change x TEP SICI correlation
 % parameters
 for a = 1:length(peaks)
     peaks_SICI{a} = [peaks{a}, ' SICI'];

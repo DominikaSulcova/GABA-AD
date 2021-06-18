@@ -34,8 +34,8 @@
 %       - line plot for each frequency subband --> visual identification of
 %       effect of the medication
 % 8) Extracts beta band amplitude
-%       - plots changes in broad beta mean amplitude
-%       - ROI: central region, TOI: broad band beta (beta1 + beta2)
+%       - plots changes in beta mean amplitude
+%       - ROI: central region, TOI: beta1, beta2, broad band beta (beta1 + beta2)
 %       --> saves values as 'beta.mat' 
 % 9) Calculates alpha attenuation coefficient (AAC)
 %       - for individual alpha subbands + broad alpha band
@@ -919,12 +919,12 @@ end
 clear m t c r b rows
 disp(['Datasize: ' num2str(size(data_beta))])
 
-% normalize broad beta amplitude to baseline - only eyes open
+% normalize beta1 amplitude to baseline - only eyes open
 for m = 1:length(medication)
     for r = 1:numel(ROI)
         for p = 1:length(participant)
-            amp_baseline = squeeze(data_beta(m, 1, 1, r, 3, p));
-            amp_raw = squeeze(data_beta(m, 2, 1, r, 3, p));
+            amp_baseline = squeeze(data_beta(m, 1, 1, r, 1, p));
+            amp_raw = squeeze(data_beta(m, 2, 1, r, 1, p));
             amp_norm(m, r, p) = amp_raw / amp_baseline * 100;
         end
     end
@@ -963,7 +963,7 @@ for m = 1:size(amp_norm, 1)  % medication
 end
 
 % set other parameters
-fig_name = 'Broad beta band, eyes open';
+fig_name = 'Beta 1 = sigma band, eyes open';
 title(fig_name, 'FontWeight', 'bold', 'FontSize', 16)
 set(gca, 'Fontsize', 14)
 legend(err, medication, 'Location', 'northeast', 'fontsize', 14, 'EdgeColor', 'none')
@@ -973,7 +973,7 @@ ylabel('relative amplitude (% baseline)')
 hold off
 
 % save figure
-fig_name = 'rsEEG_change_beta';
+fig_name = 'rsEEG_change_sigma';
 savefig([fig_name '.fig'])
 saveas(fig, [fig_name '.png'])
 
@@ -981,23 +981,28 @@ saveas(fig, [fig_name '.png'])
 figure_counter = figure_counter + 1;
 clear f c m r x y CI err fig fig_name sem_visual amp_norm 
 
-% extract broad beta --> central region, eyes open
+% extract amplitude from all beta bands --> central region, eyes open
+beta_fbands{end + 1} = 'broad';
 for m = 1:length(medication)
     % raw beta
     for t = 1:length(time)
         for p = 1:length(participant)
-            beta(m, t, p) = squeeze(data_beta(m, t, 1, 2, 3, p));
+            for b = 1:length(beta_fbands)
+                beta(m, t, p, b) = squeeze(data_beta(m, t, 1, 2, b, p));
+            end
         end
     end
     
     % change --> normalized beta
     for p = 1:length(participant)
-        beta_change(m, p) = (beta(m, 2, p)/beta(m, 1, p))*100 - 100;
+        for b = 1:length(beta_fbands)
+            beta_change(m, p, b) = (beta(m, 2, p, b)/beta(m, 1, p, b))*100 - 100;
+        end
     end
 end
 save('beta.mat', 'beta'); save('beta_change.mat', 'beta_change'); 
 
-clear m t p data_beta
+clear m t p b data_beta
 
 %% 9) alpha attenuation coeficient  
 % ----- extract AAC -----
@@ -1023,7 +1028,7 @@ for m = 1:length(medication)
     end 
 end
 % update alpha bands
-alpha_fbands = [alpha_fbands, {'broad'}];
+alpha_fbands{end + 1} = 'broad';
 alpha_fbands_txt = {'low alpha 1' 'low alpha 2'  'high alpha 3' 'broad alpha'};
 
 % calculate ACC
