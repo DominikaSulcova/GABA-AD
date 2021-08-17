@@ -1,0 +1,117 @@
+---
+title: "GABA-AD: mixed models statistics"
+output: html_notebook
+chunk_output_type: inline
+---
+
+```{r chunk_setup, include = FALSE, eval = TRUE}
+knitr::opts_chunk$set(echo = T, message = F, warning = F, comment=NA, autodep = F, eval = T, cache.rebuild = F, cache = T, R.options = list(width = 120), fig.width = 8, fig.align = 'center', dev.args = list(bg = 'transparent'), dev = 'svglite')
+```
+
+## Effect of pharmacological actvation of GABAARs
+### Outcome variables
+- **TEPs**: 5 components (= amplitudes)
+  - **mean amplitude** across 25% of points from the window of         interest, which are the most distant from 0
+  - **latency** calculated from the median point included in         the amplitude calculation
+- **MEPs**: 1 component
+  - peak-to-peak amplitude
+- **RS-EEG**: 3 extracted variables
+  - mean power across the lower beta band = **sigma peak**
+  - **Alpha Attenuation Coefficient** (eyes closed/eyes open)
+  - **Spectral Exponent** of the 1/f slope
+        
+All outcome variables are presented as the difference between the value post-medication and the value at baseline
+
+### Fixed effects
+- **MEDICATION**: alprazolam x placebo
+  - binomial = 2 levels
+- **STIMULUS**: CS x TS
+  - binomial = 2 levels
+- Covariate: **rMT change** 
+  - discrete counts (only positive integers)
+- Covariate: **baseline value** of outcome variables
+  - continuous value
+
+### Random effects
+- **SUBJECT**: to account for unknown interpersonal variability
+
+Following pipeline treats each outcome measure separately, as an independent measure
+
+## Data visualization
+Load packages
+```{r basic_packages, include = FALSE, eval = TRUE}
+library(tidyverse)
+library(lme4)
+library(car)
+library(ggplot2)
+library(MASS)
+library(dplyr)
+library(ggpubr)
+library(corrplot) 
+library(visreg) 
+library(rgl)
+library(knitr)
+library(scatterplot3d)
+library(merTools)
+library(readr)
+```
+
+Import data in R-compatible long format
+```{r import}
+data_all <- read.csv('C:/Users/Sneaky/UCL/O365G-NOCIONS - dsulcova/GABA-AD_results/Data/GABA_med_long.csv')
+head(data, 10)
+```
+
+Choose the outcome variable of interest 
+```{r choose data}
+# define outcome variable of interest
+variable <- c('P30', 'amplitude')
+
+# choose columns to keep
+vars_keep <- c('subject', 'medication', 'time', 'stimulus', 'peak', 'TEP', 'rMT')
+
+# make into factors
+data <- as_tibble(data_all[vars_keep]) 
+data$subject <- factor(data$subject)
+data$medication <- factor(data$medication)
+data$time <- factor(data$time)
+data$stimulus <- factor(data$stimulus)
+
+# choose peak of interest
+peak_names <- c('P30', 'N45', 'P60', 'N100', 'P180')
+index <- which(peak_names == variable[1])
+data <- data[data$peak == index, -5] 
+
+# calculate change post-medication
+change <- data[data$time == 1, 5] - data[data$time == 0, 5]
+data <- data[data$time == 0, -3] %>%
+  rename_at(vars('TEP'), ~ as.character('baseline')) %>%
+  add_column(change = deframe(change))
+rm(change)
+head(data, 10)
+```
+
+Get basic descriptive statistics of the data 
+```{r desctiptive}
+describe <- function(x){
+  print(round(c(mean = mean(x, na.rm = TRUE),
+            median = median(x, na.rm = TRUE),
+            min = min(x, na.rm = TRUE),
+            max = max(x, na.rm = TRUE),
+            std = sd(x, na.rm = TRUE)), digits = 2))}
+
+# check variable at baseline
+cat(paste(variable[1],  ' - baseline: \n'))
+describe(data$baseline)
+cat('grouped by stimulus: \n')
+aggregate(baseline ~ stimulus, data = data, FUN = describe)
+cat('grouped by medication: \n')
+aggregate(baseline ~ medication, data = data, FUN = describe)
+```
+
+Plot the distribution 
+```{r}
+
+```
+
+
