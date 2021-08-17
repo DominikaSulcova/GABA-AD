@@ -37,13 +37,14 @@ for m = 1:length(medication)
 end
 clear m s t p merge_idx data header message_string name_new name_old
 
+%% rename treatments
+clear all
+clc
+
 % parameters
 participant = 1:20;
 stimulus = {'CS 80' 'TS 120' 'ppTMS 80120'};
 session = {'S1' 'S2'};
-time = {'pre' 'post'};
-prefix = 'long avgchan icfilt assigned2 ica26 but fft-notchfilt prefilt assigned prea28 visual complete A10 reref'; 
-path = 'F:\GABA-AD\Data\Processed data\YC\M1_TMS-EEG';
 
 % deal with treatments
 med_session = table2cell(readtable('treatments.xlsx'));
@@ -58,7 +59,18 @@ for a = 1 : size(med_session, 1)
 end
 clear a b 
 
-% calculate number of epochs
+%% calculate number of epochs
+clear all
+clc
+
+% parameters
+participant = 1:20;
+stimulus = {'CS 80' 'TS 120' 'ppTMS 80120'};
+session = {'S1' 'S2'};
+time = {'pre' 'post'};
+prefix = 'long avgchan icfilt assigned2 ica26 but fft-notchfilt prefilt assigned prea28 visual complete A10 reref'; 
+path = 'F:\GABA-AD\Data\Processed data\YC\M1_TMS-EEG';
+
 % p = 1; se = 1; t = 1; s = 1;
 for p = 1:length(participant)
     for se = 1:length(session)
@@ -82,3 +94,36 @@ end
 clear p se s t data
 
 save('epochs.mat', 'epochs')
+
+%% rename event code
+clear all
+clc
+
+% parameters
+group = 'MCI-CTRL';
+participant = [206];
+% group = 'CNRAD';
+% participant = [302, 306, 307, 308, 310];
+time = {'pre' 'post'};
+prefix = 'EEG AG'; 
+path = 'E:\Data\GABA-AD - data\Processed data\AGED\AG_TMS-EEG';
+eventcode = 'Stimulation';
+
+% p = 1; t = 1; e = 1;
+for p = 1:length(participant)
+    for t = 1:length(time)
+        % load header
+        load([path '\' prefix ' ' group ' ' num2str(participant(p)) ' ' time{t} '.lw6'], '-mat') 
+        
+        % rename all events
+        for e = 1:length(header.events)
+            header.events(e).code = eventcode;
+        end
+        
+        % save the header
+        save([path '\' prefix ' ' group ' ' num2str(participant(p)) ' ' time{t} '.lw6'], 'header')
+    end
+end
+clear p t e 
+
+

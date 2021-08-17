@@ -229,7 +229,7 @@ for a = 1:length(time)
     % ditch extra 'out' category
     T = struct2table(header.events);                                    % creates a table of the structure 'events'
                 T.code = categorical(T.code);                           % in order to work with strings --> convert to categorical
-                sortedT = T(T.code == 'B - Stimulation', :); 
+                sortedT = T(T.code == event_code, :); 
                 sortedT.code = cellstr(sortedT.code);                   % turns the categorical data back to string cells
                 header.events = table2struct(sortedT);                  % turns the sorted table back in a structure field 
                 header.events = header.events';
