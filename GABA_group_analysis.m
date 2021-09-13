@@ -479,7 +479,7 @@ save('GABA_average.mat', 'rMT', 'TEP_ICA', 'TEP_epochs')
 % prepare empty table
 GABA_med_long = table;
 GABA_med_long.subject = zeros(0);  GABA_med_long.medication = zeros(0); GABA_med_long.time = zeros(0); GABA_med_long.stimulus = zeros(0); 
-GABA_med_long.peak = zeros(0); GABA_med_long.TEP = zeros(0); GABA_med_long.MEP = zeros(0); 
+GABA_med_long.peak = zeros(0); GABA_med_long.TEP_amp = zeros(0); GABA_med_long.TEP_lat = zeros(0); GABA_med_long.MEP = zeros(0); 
 GABA_med_long.beta = zeros(0); GABA_med_long.AAC = zeros(0); GABA_med_long.SE = zeros(0); 
 GABA_med_long.rMT = zeros(0); 
 
@@ -498,8 +498,12 @@ for p = 1:length(participant)
                     GABA_med_long.stimulus(row_cnt) = s - 1;
                     GABA_med_long.peak(row_cnt) = c;
 
-                    % outcome variables - TEP
-                    statement = ['GABA_med_long.TEP(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(c);'];
+                    % outcome variables - TEP amplitude
+                    statement = ['GABA_med_long.TEP_amp(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(1, c);'];
+                    eval(statement)
+                    
+                    % outcome variables - TEP latency
+                    statement = ['GABA_med_long.TEP_lat(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(2, c);'];
                     eval(statement)
 
                     % outcome variables - MEP

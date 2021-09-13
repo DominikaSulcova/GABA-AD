@@ -28,7 +28,7 @@ All outcome variables are presented as the difference between the value post-med
 - **STIMULUS**: CS x TS
   - binomial = 2 levels
 - Covariate: **rMT change** 
-  - discrete counts (only positive integers)
+  - continuous value
 - Covariate: **baseline value** of outcome variables
   - continuous value
 
@@ -56,16 +56,22 @@ library(merTools)
 library(readr)
 ```
 
+Set graphic parameters for visualization
+```{r graphic pars}
+# color palette - red/blue/purple/green(light + dark)
+col_palette = c('cadetblue1', 'turquoise4', 'tomato1', 'red3', 'mediumorchid1', 'darkmagenta', 'olivedrab3', 'olivedrab4')
+```
+
 Import data in R-compatible long format
 ```{r import}
-data_all <- read.csv('C:/Users/Sneaky/UCL/O365G-NOCIONS - dsulcova/GABA-AD_results/Data/GABA_med_long.csv')
-head(data, 10)
+data_all <- read.csv('C:/Users/uzivatel/UCL/O365G-NOCIONS - dsulcova/GABA-AD_results/Data/GABA_med_long.csv')
+head(data_all, 10)
 ```
 
 Choose the outcome variable of interest 
 ```{r choose data}
 # define outcome variable of interest
-variable <- c('P30', 'amplitude')
+variable <- c('P60', 'amplitude')
 
 # choose columns to keep
 vars_keep <- c('subject', 'medication', 'time', 'stimulus', 'peak', 'TEP', 'rMT')
@@ -98,7 +104,7 @@ describe <- function(x){
             median = median(x, na.rm = TRUE),
             min = min(x, na.rm = TRUE),
             max = max(x, na.rm = TRUE),
-            std = sd(x, na.rm = TRUE)), digits = 2))}
+            std = sd(x, na.rm = TRUE)), digits = 4))}
 
 # check variable at baseline
 cat(paste(variable[1],  ' - baseline: \n'))
@@ -109,9 +115,81 @@ cat('grouped by medication: \n')
 aggregate(baseline ~ medication, data = data, FUN = describe)
 ```
 
-Plot the distribution 
-```{r}
+Visualize the data, test for normality
+```{r first look}
+# baseline
+dist_bl <- data %>%
+  ggplot(aes(x = baseline, fill = stimulus)) +
+  geom_histogram(color = 'white', alpha = 0.6, position = 'identity') +
+  scale_fill_manual(name = 'stimulus',
+                    breaks = c(0, 1),
+                    labels = c('80 %rMT', '120 %rMT'),
+                    values = col_palette[c(8, 6)]) +
+  ggtitle(paste(variable[1], ': ','baseline amplitude distribution')) +
+  theme(text = element_text(size = 15),
+        panel.background = element_rect(fill = 'white'),
+        axis.line = element_line(colour = 'black')) 
+dist_bl
 
+# baseline - test of normality
+shapiro.test(data$baseline[data$stimulus == 0 & data$medication == 0])
+shapiro.test(data$baseline[data$stimulus == 0 & data$medication == 1])
+shapiro.test(data$baseline[data$stimulus == 1 & data$medication == 0])
+shapiro.test(data$baseline[data$stimulus == 1 & data$medication == 1]) 
+
+# change
+dist_change <- data %>%
+  ggplot(aes(x = change, fill = medication)) +
+  geom_histogram(color = 'white', alpha = 0.6, position = 'identity') +
+  scale_fill_manual(name = 'medication',
+                    breaks = c(0, 1),
+                    labels = c('placebo', 'alprazolam'),
+                    values = col_palette[c(2, 4)]) +
+  ggtitle(paste(variable[1], ': ','amplitude change distribution')) +
+  theme(text = element_text(size = 15),
+        panel.background = element_rect(fill = 'white'),
+        axis.line = element_line(colour = 'black')) 
+dist_change
+
+box_change <- data %>%
+  ggplot(aes(x = stimulus, y = change,  fill = medication)) +
+  geom_boxplot(alpha = 0.6) +
+  scale_fill_manual(name = 'medication',
+                    breaks = c(0, 1),
+                    labels = c('placebo', 'alprazolam'),
+                    values = col_palette[c(2, 4)]) +
+  scale_x_discrete(labels = c('0' = '80 %rMT', '1' = '120 %rMT')) +
+  ggtitle(paste(variable[1], ': ','amplitude change')) +
+  theme(text = element_text(size = 15),
+        panel.background = element_rect(fill = 'white'),
+        axis.line = element_line(colour = 'black')) 
+box_change 
+
+# change - test of normality
+data_test = data$change[data$stimulus == 0 & data$medication == 0]
+shapiro.test(data_test)
+qqnorm(data_test)
+qqline(data_test)
+
+
+data_test = data$change[data$stimulus == 0 & data$medication == 1]
+shapiro.test(data_test)
+qqnorm(data_test)
+qqline(data_test)
+
+data_test = data$change[data$stimulus == 1 & data$medication == 0]
+shapiro.test(data_test)
+qqnorm(data_test)
+qqline(data_test)
+
+data_test = data$change[data$stimulus == 1 & data$medication == 1]
+shapiro.test(data_test)
+qqnorm(data_test)
+qqline(data_test)
+
+# homoscedasticity
+leveneTest(change ~ medication, data = data[data$stimulus == 0, ], center = median)
+leveneTest(change ~ medication, data = data[data$stimulus == 1, ], center = median)
 ```
 
 
