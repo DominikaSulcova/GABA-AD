@@ -67,7 +67,27 @@ xstep = header.xstep;
 x = [time_window(1):xstep:time_window(2)];
 x_start = (time_window(1) - header.xstart)/xstep;
 x_end = (time_window(2) - header.xstart)/xstep;
-load('colours.mat'); 
+
+% check for colour scheme
+answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
+switch answer
+    case 'YES'
+        a = 1;
+        for p = 1:6
+            for c = 1:length(current)
+               colours(a, :) = uisetcolor; 
+               a = a + 1;
+            end
+        end
+    case 'NO'
+        if exist('colours.mat') > 0
+            load('colours.mat')
+        else
+            disp('No colour scheme found in this directory!')    
+        end
+end
+save('colours.mat', 'colours'); 
+clear a answer
 
 % create output folders
 filename = ['GABA_' group '_' target];
@@ -245,7 +265,7 @@ clear m s t e e_n fig lgd data_visual CI_visual figure_name P F yl
 save([folderpath '\' filename '.mat'], 'data_mean', 'data_CI', '-append');
 clear electrode 
 
-%% 3) GMFP
+%% 3) GMFP - peak identification
 % ----- decide output parameters -----
 labeled = 'off';
 max_peaks = 6;
@@ -265,7 +285,7 @@ clear m t s
 header.chanlocs(31:end) = [];
 header.datasize(2) = 30;  
 
-% ----- plot global GMFP per stimulus ----- 
+% plot global GMFP per stimulus 
 for s = 1:length(stimulus)
     % pool all conditions together
     for i = 1:size(GABA_GMFP, 4)
@@ -314,81 +334,118 @@ for s = 1:length(stimulus)
 end
 clear s i t e data_visual data_topoplot fig figure_name pos h_axis GABA_peaks
 
-% ----- plot baseline vs. post-medication -----
+% append new variables to the general MATLAB file
+save([folderpath '\' filename '.mat'], 'GABA_GMFP', '-append');
+clear labeled max_peaks 
+
+%% 4) GMFP - plot difference
+% ----- decide output parameters -----
+TOI_peaks = [0.03 0.045 0.060 0.100 0.180];
+peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
+% ------------------------------------
+
+% calculate GMFP for each subject/condition
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus) 
+            for p = 1:length(participant)
+                % calculate GMFP
+                GABA_GMFP_subject(m, t, s, p, :) = std(squeeze(GABA_data(m, t, s, p, 1:30, :)), 1);
+            end
+        end
+    end
+end
+clear m t s p 
+
+% plot baseline vs. post-medication
+lines = {':' '-'};
 for m = 1:length(medication)
     for s = [1 2]
         % load grand average data                
-        data_visual = squeeze(GABA_GMFP(m, :, s, :));
+        data_visual = squeeze(mean(squeeze(GABA_GMFP_subject(m, :, s, :, :)), 2));
 
         % launch the figure
         fig = figure(figure_counter);
-        h_axis(1) = subplot(4, max_peaks, [1 : 2*max_peaks]);
+        h_axis(1) = subplot(4, length(TOI_peaks) + 1 , 1 : 2*(length(TOI_peaks) + 1));
+        title(sprintf('GMFP: %s - %s', stimulus{s}, medication{m}),...
+            'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'fontsize', 12)
+        xlabel('time (s)')
+        ylabel('GMFP (\muV)')
         hold on
         
-        % plot the shading
-        title(['M1 - ' stimulus{s} ', ' medication{m} ': GMFP'], 'fontsize', 16, 'fontweight', 'bold')
-        F = fill([x fliplr(x)],[data_visual(1, :) fliplr(data_visual(2, :))], ...
-            [0.75 0.75 0.75] , 'linestyle', 'none');
-        
-        % set parameters of the figure
+        % set limits of the figure
+        plot(x, data_visual(1, :))
         yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
-        set(gca, 'fontsize', 11)
-        ylim(yl)
-        xlabel('time (s)')
-        ylabel('power (\muV^2)')
-        
+        xl = get(gca, 'xlim');
+        cla(h_axis(1))
+        ylim(yl); xlim(xl);
+
         % plot interpolated part
-        rectangle('Position', [0, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none') 
+        rectangle('Position', [0, yl(1)+0.01, 0.01, yl(2) - yl(1)],...
+            'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none'); 
+
+        % plot the shading
+        F = fill([x fliplr(x)],[data_visual(1, :) fliplr(data_visual(2, :))], ...
+            colours((m-1)*2 + 1, :), 'linestyle', 'none', 'facealpha', 0.5);
+        F.Annotation.LegendInformation.IconDisplayStyle = 'off';
 
         % plot GMFP
         for t = 1:length(time)
             % plot signal
-            P(t) = plot(x, data_visual(t, :), 'Parent', h_axis(1), ...
-                'Color', colours((m - 1)*2 + t, :), 'LineWidth', 2.5);
-            
-            % extract and mark baseline peak latencies
-            if t == 1
-                [GABA_peaks_x, GABA_peaks_y] = gmfp_peaks(data_visual(t, :), time_window, xstep, 'max_peaks', max_peaks);
-                for p = 1:length(GABA_peaks_x)
-                    line([GABA_peaks_x(p), GABA_peaks_x(p)], [yl(1), GABA_peaks_y(p)], ...
-                        'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1.5)
-                end
-            end
-            
+            plot(x, data_visual(t, :), 'Parent', h_axis(1), ...
+                'Color', colours((m-1)*2 + 2, :), 'LineStyle', lines{t}, 'LineWidth', 2.5);
+        end
+        
+        % mark TMS stimulus
+        line([0, 0], yl, 'Parent', h_axis(1), 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)  
+
+        % add legend
+        lgd = legend({'baseline' 'post medication'}, 'Location', 'southeast');
+        lgd.FontSize = 12; 
+        
+        % add topoplots
+        for t = 1:length(time)
             % choose data for topoplots 
             for e = 1:30
-                data_topoplot(1, e, 1, 1, 1, :) = data_mean(m, t, s, e, :);
+                for i = 1:size(GABA_data, 6)
+                    data_topoplot(1, e, 1, 1, 1, i) = mean(squeeze(GABA_data(m, t, s, :, e, i)), 'all');
+                end
             end
 
-            % add topoplots
-            for p = 1:length(GABA_peaks_x)
+            % add topoplots for all peaks
+            for k = 1:length(TOI_peaks)
+                n = 1 + (t-1)*length(TOI_peaks) + k;
+
                 % plot the topoplot
-                h_axis(1 + (t-1)*length(GABA_peaks_x) + p) = subplot(4, max_peaks, 2*max_peaks + (t-1)*max_peaks + p);
-                topo_plot(header, data_topoplot, GABA_peaks_x(p), time_window(1), [-2, 2])
+                h_axis(n) = subplot(4, length(TOI_peaks) + 1, 2*(length(TOI_peaks) + 1) + (t-1)*(length(TOI_peaks)+1) + k);
+                topo_plot(header, data_topoplot, TOI_peaks(k), time_window(1), [-2, 2])
 
-                % shift down
-                pos = get(h_axis(1 + (t-1)*length(GABA_peaks_x) + p), 'Position');
-                pos(2) = pos(2) - 0.05;
-                set(h_axis(1 + (t-1)*length(GABA_peaks_x) + p), 'Position', pos);
+                % modifies the layout
+                if t == 1
+                    pos = get(h_axis(n), 'Position');
+                    pos(2) = pos(2) - 0.04;
+                    set(h_axis(n), 'Position', pos);
+                else
+                    text(-0.2, -0.7, peaks{k}, 'FontWeight', 'bold', 'FontSize', 12)
+                end
 
-                % add description above first topoplot
-                if p == length(GABA_peaks_x)
-                    hold on
+                if k == length(TOI_peaks)
                     if t == 1
                         descript = 'baseline';
                     else
                         descript = sprintf('post \nmedication');
                     end                    
-                    text(0.8, 0, descript, 'Parent', h_axis(1 + (t-1)*length(GABA_peaks_x) + p), ...
-                        'Color', colours((m - 1)*2 + t, :), 'FontSize', 14)
+                    text(0.8, 0, descript, 'Parent', h_axis(n), ...
+                        'Color', [0 0 0], 'FontSize', 12)
                 end
             end
         end
-        
-        % mark TMS stimulus
-        line([0, 0], yl, 'Parent', h_axis(1), 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)  
-        
         hold off
+        
+        % change figure position
+        pos = get(gcf, 'Position');
+        fig.Position = [pos(1) pos(2)-200 660 550];
 
         % save figure
         figure_name = ['GMFP_' target '_' stimulus{s} '_' medication{m}];
@@ -399,13 +456,151 @@ for m = 1:length(medication)
         figure_counter = figure_counter + 1;
     end
 end
-clear s m t F P e i data_visual data_topoplot fig figure_name pos h_axis p descript GABA_peaks_x GABA_peaks_y yl
+clear lines s m t fig h_axis yl xl F lgd pos k n  P R L descript figure_name e i
 
 % append new variables to the general MATLAB file
-save([folderpath '\' filename '.mat'], 'GABA_GMFP', '-append');
-clear labeled max_peaks 
+save([folderpath '\' filename '.mat'], 'GABA_GMFP_subject', '-append');
+clear TOI TOI_peaks peaks
 
-%% 4) peak widths
+%% 5) DISS
+% normalize data by GMFP
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus) 
+            for p = 1:length(participant)
+                for i = 1:size(GABA_data, 6)
+                    % devide data at each time point by GMFP
+                    GABA_data_norm(m, t, s, p, :, i) = squeeze(GABA_data(m, t, s, p, 1:30, i)) / GABA_GMFP_subject(m, t, s, p, i);
+                end
+            end
+        end
+    end
+end
+clear m t s p i
+
+% select baseline data of both sessions
+for s = 1:length(stimulus)
+    counter = 1;
+    for p = 1:length(participant)
+        for m = 1:length(medication)
+            data_temp(s, counter, :, :) = squeeze(GABA_data_norm(m, 1, s, p, :, :));
+            counter = counter + 1;
+        end
+    end
+end
+clear s p m counter
+
+% ----- baseline -----
+% calculate DISS and spatial correlation C
+GABA_DISS = struct;
+for p = 1:2*length(participant)
+    for i = 1:size(GABA_data_norm, 6)
+        % between TS and CS stimuli
+        diff = squeeze(data_temp(2, p, :, i) - data_temp(1, p, :, i));
+        GABA_DISS.baseline.stimulus(1, p, i) = sqrt(mean(diff.^2));
+        GABA_DISS.baseline.stimulus(2, p, i) = 1 - (GABA_DISS.baseline.stimulus(1, p, i)^2)/2;
+        
+        % between ppTMS and TS stimuli
+        diff = squeeze(data_temp(3, p, :, i) - data_temp(2, p, :, i));
+        GABA_DISS.baseline.SICI(1, p, i) = sqrt(mean(diff.^2));
+        GABA_DISS.baseline.SICI(2, p, i) = 1 - (GABA_DISS.baseline.SICI(1, p, i)^2)/2;
+    end
+end
+clear p i diff
+
+% plot baseline TS-CS
+data_visual = squeeze(mean(GABA_DISS.baseline.stimulus(:, :, :), 2));
+fig = figure(figure_counter);
+hold on
+title('Global dissimilarity: baseline TS - CS', 'FontSize', 16, 'FontWeight', 'bold')
+set(gca, 'fontsize', 12); xlabel('time (s)')
+ax = gca; ax.XColor = [0.5 0.5 0.5];
+plot(x, data_visual(1, :), 'Color', colours(2, :), 'LineWidth', 2.5)
+fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+    colours(1, :) , 'facealpha', 0.5, 'linestyle', 'none');
+line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
+line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
+line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+ylim([-0.75 1.75]); 
+lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
+lgd.FontSize = 12;
+hold off
+figure_name = ['DISS_' target '_bl_stimulus'];
+savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
+saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+figure_counter = figure_counter + 1;
+clear data_visual fig ax lgd figure_name
+
+% plot baseline ppTMS-TS (SICI)
+data_visual = squeeze(mean(GABA_DISS.baseline.SICI(:, :, :), 2));
+fig = figure(figure_counter);
+hold on
+title('Global dissimilarity: baseline SICI', 'FontSize', 16, 'FontWeight', 'bold')
+set(gca, 'fontsize', 12); xlabel('time (s)')
+ax = gca; ax.XColor = [0.5 0.5 0.5];
+plot(x, data_visual(1, :), 'Color', colours(6, :), 'LineWidth', 2.5)
+fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+    colours(5, :) , 'facealpha', 0.5, 'linestyle', 'none');
+line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
+line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
+line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+ylim([-0.75 1.75]); 
+lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
+lgd.FontSize = 12;
+hold off
+figure_name = ['DISS_' target '_bl_SICI'];
+savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
+saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+figure_counter = figure_counter + 1;
+clear data_visual fig ax lgd figure_name
+
+% ----- pre-post medication -----
+% calculate DISS and spatial correlation C
+for m = 1:length(medication)
+    for s = 1:length(stimulus)
+        for p = 1:length(participant)
+            for i = 1:size(GABA_data_norm, 6)
+                diff = squeeze(GABA_data_norm(m, 2, s, p, :, i) - GABA_data_norm(m, 1, s, p, :, i));
+                GABA_DISS.medication(1, m, s, p, i) = sqrt(mean(diff.^2));
+                GABA_DISS.medication(2, m, s, p, i) = 1 - (GABA_DISS.medication(1, m, s, p, i)^2)/2;
+            end
+        end
+    end
+end
+clear m s p i diff
+
+% plot 
+for m = 1:length(medication)
+    for s = 1:length(stimulus) 
+        data_visual = squeeze(mean(GABA_DISS.medication(:, m, s, :, :), 4));
+        fig = figure(figure_counter);
+        hold on
+        title(sprintf('Global dissimilarity: %s, %s', medication{m}, stimulus{s}), 'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'fontsize', 12); xlabel('time (s)')
+        ax = gca; ax.XColor = [0.5 0.5 0.5];
+        plot(x, data_visual(1, :), 'Color', colours((m-1)*2 + 2, :), 'LineWidth', 2.5)
+        fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+            colours((m-1)*2 + 1, :) , 'facealpha', 0.5, 'linestyle', 'none');
+        line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
+        line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
+        line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+        ylim([-0.75 1.75]); 
+        lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
+        lgd.FontSize = 12;
+        hold off
+        figure_name = ['DISS_' target '_' medication{m} '_' stimulus{s}];
+        savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
+        saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+        figure_counter = figure_counter + 1;
+    end
+end
+clear m s data_visual fig ax lgd figure_name
+
+% append new variables to the general MATLAB file
+save([folderpath '\' filename '.mat'], 'GABA_data_norm', 'GABA_DISS', '-append');
+clear data_temp
+
+%% ) peak widths
 % calculate narrow window parameters
 x_start_narrow = (0.01 - time_window(1))/xstep;
 x_end_narrow = (0.25 - time_window(1))/xstep;
@@ -691,7 +886,7 @@ end
 set(gca, 'fontsize', 14)
 ylim(yl)
 xlabel('time (s)')
-ylabel('power (\muV^2)')
+ylabel('potential (\muV)')
 end
 function [peak_x, peak_y] = gmfp_peaks(y, time_window, xstep, varargin)
 % check whether to plot labels (default)
