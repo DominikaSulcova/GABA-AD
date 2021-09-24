@@ -228,13 +228,13 @@ clear m e t e_n fig lgd data_visual CI_visual figure_name P F yl
 save([folderpath '\' filename '.mat'], 'data_mean', 'data_CI', '-append');
 clear electrode 
 
-%% 3) GMFP
+%% 3) GMFP - peak identification
 % ----- decide output parameters -----
 labeled = 'off';
 max_peaks = 6;
 % ------------------------------------
 
-% calculate GMFP (exclude target and eoi channels)
+% calculate global GMFP (exclude target and eoi channels)
 for m = 1:length(medication)
     for t = 1:length(time)
         GABA_GMFP(m, t, :) = std(squeeze(data_mean(m, t, 1:30, :)), 1);  
@@ -246,7 +246,6 @@ clear m t
 header.chanlocs(31:end) = [];
 header.datasize(2) = 30;  
 
-% ----- plot global GMFP ----- 
 % pool all conditions together
 for i = 1:size(GABA_GMFP, 3)
     data_visual(i) = mean(GABA_GMFP(:, :, i), 'all');
@@ -292,91 +291,6 @@ saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
 % update figure counteer
 figure_counter = figure_counter + 1;
 clear i t e data_visual data_topoplot fig figure_name pos h_axis GABA_peaks
-
-% ----- plot baseline vs. post-medication -----
-for m = 1:length(medication)
-    % load grand average data                
-    data_visual = squeeze(GABA_GMFP(m, :, :));
-
-    % launch the figure
-    fig = figure(figure_counter);
-    h_axis(1) = subplot(4, max_peaks, [1 : 2*max_peaks]);
-    hold on
-
-    % plot the shading
-    title(['M1 - ' stimulus{s} ', ' medication{m} ': GMFP'], 'fontsize', 16, 'fontweight', 'bold')
-    F = fill([x fliplr(x)],[data_visual(1, :) fliplr(data_visual(2, :))], ...
-        [0.75 0.75 0.75] , 'linestyle', 'none');
-
-    % set parameters of the figure
-    yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
-    set(gca, 'fontsize', 11)
-    ylim(yl)
-    xlabel('time (s)')
-    ylabel('power (\muV^2)')
-
-    % plot interpolated part
-    rectangle('Position', [0, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none') 
-
-    % plot GMFP
-    for t = 1:length(time)
-        % plot signal
-        P(t) = plot(x, data_visual(t, :), 'Parent', h_axis(1), ...
-            'Color', colours(t, :), 'LineWidth', 2.5);
-
-        % extract and mark baseline peak latencies
-        if t == 1
-            [GABA_peaks_x, GABA_peaks_y] = gmfp_peaks(data_visual(t, :), time_window, xstep, 'max_peaks', max_peaks);
-            for p = 1:length(GABA_peaks_x)
-                line([GABA_peaks_x(p), GABA_peaks_x(p)], [yl(1), GABA_peaks_y(p)], ...
-                    'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1.5)
-            end
-        end
-
-        % choose data for topoplots 
-        for e = 1:30
-            data_topoplot(1, e, 1, 1, 1, :) = data_mean(m, t, e, :);
-        end
-
-        % add topoplots
-        for p = 1:length(GABA_peaks_x)
-            % plot the topoplot
-            h_axis(1 + (t-1)*length(GABA_peaks_x) + p) = subplot(4, max_peaks, 2*max_peaks + (t-1)*max_peaks + p);
-            topo_plot(header, data_topoplot, GABA_peaks_x(p), time_window(1), [-2, 2])
-
-            % shift down
-            pos = get(h_axis(1 + (t-1)*length(GABA_peaks_x) + p), 'Position');
-            pos(2) = pos(2) - 0.05;
-            set(h_axis(1 + (t-1)*length(GABA_peaks_x) + p), 'Position', pos);
-
-            % add description above first topoplot
-            if p == length(GABA_peaks_x)
-                hold on
-                if t == 1
-                    descript = 'baseline';
-                else
-                    descript = sprintf('post \nmedication');
-                end                    
-                text(0.8, 0, descript, 'Parent', h_axis(1 + (t-1)*length(GABA_peaks_x) + p), ...
-                    'Color', colours(t, :), 'FontSize', 14)
-            end
-        end
-    end
-
-    % mark TMS stimulus
-    line([0, 0], yl, 'Parent', h_axis(1), 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)  
-
-    hold off
-
-    % save figure
-    figure_name = ['GMFP_' target '_' medication{m}];
-    savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-    saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
-
-    % update figure counteer
-    figure_counter = figure_counter + 1;
-end
-clear m t F P e i data_visual data_topoplot fig figure_name pos h_axis p descript GABA_peaks_x GABA_peaks_y yl
 
 % append new variables to the general MATLAB file
 save([folderpath '\' filename '.mat'], 'GABA_GMFP', '-append');
@@ -449,7 +363,7 @@ end
 set(gca, 'fontsize', 14)
 ylim(yl)
 xlabel('time (s)')
-ylabel('power (\muV^2)')
+ylabel('potential (\muV)')
 end
 function [peak_x, peak_y] = gmfp_peaks(y, time_window, xstep, varargin)
 % check whether to plot labels (default)
