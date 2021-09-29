@@ -79,6 +79,7 @@ switch answer
                a = a + 1;
             end
         end
+        save('colours.mat', 'colours'); 
     case 'NO'
         if exist('colours.mat') > 0
             load('colours.mat')
@@ -86,7 +87,6 @@ switch answer
             disp('No colour scheme found in this directory!')    
         end
 end
-save('colours.mat', 'colours'); 
 clear a answer
 
 % create output folders
@@ -98,9 +98,8 @@ if ~exist(folderpath)
 end      
 
 %% 1) extract individual data
-% load data based on the prefix + conditions
+% load data --> corrected ppTMS TEPs
 n = length(labels.TS) - length(labels.CS);
-% m = 1; t = 1; s = 1; p = 1;
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus)
@@ -133,6 +132,10 @@ end
 % ----- decide output parameters -----
 electrode = {'target'};
 % ------------------------------------
+% load data if not loaded
+if exist('GABA_data') ~= 1
+    load([folderpath '\' filename '.mat'], 'GABA_data')
+end
 
 % prepare average statistics
 for m = 1:length(medication)
@@ -270,6 +273,9 @@ clear electrode
 labeled = 'off';
 max_peaks = 6;
 % ------------------------------------
+if exist('GABA_data') ~= 1
+    load([folderpath '\' filename '.mat'], 'GABA_data')
+end
 
 % calculate GMFP (exclude target and eoi channels)
 for m = 1:length(medication)
@@ -343,7 +349,6 @@ clear labeled max_peaks
 TOI_peaks = [0.03 0.045 0.060 0.100 0.180];
 peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
 % ------------------------------------
-
 % calculate GMFP for each subject/condition
 for m = 1:length(medication)
     for t = 1:length(time)
@@ -463,6 +468,11 @@ save([folderpath '\' filename '.mat'], 'GABA_GMFP_subject', '-append');
 clear TOI TOI_peaks peaks
 
 %% 5) DISS
+% load data if not loaded
+if exist('GABA_GMFP_subject') ~= 1
+    load([folderpath '\' filename '.mat'], 'GABA_GMFP_subject')
+end
+
 % normalize data by GMFP
 for m = 1:length(medication)
     for t = 1:length(time)
@@ -510,49 +520,32 @@ clear p i diff
 
 % plot baseline TS-CS
 data_visual = squeeze(mean(GABA_DISS.baseline.stimulus(:, :, :), 2));
-fig = figure(figure_counter);
-hold on
-title('Global dissimilarity: baseline TS - CS', 'FontSize', 16, 'FontWeight', 'bold')
-set(gca, 'fontsize', 12); xlabel('time (s)')
-ax = gca; ax.XColor = [0.5 0.5 0.5];
-plot(x, data_visual(1, :), 'Color', colours(2, :), 'LineWidth', 2.5)
-fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
-    colours(1, :) , 'facealpha', 0.5, 'linestyle', 'none');
-line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
-line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
-line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
-ylim([-0.75 1.75]); 
-lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
-lgd.FontSize = 12;
+fig = figure(figure_counter); hold on
+plot_DISS(x, data_visual, 'Global dissimilarity: baseline TS - CS', colours([2 1], :), time_window)
 hold off
+
+% save the figure
 figure_name = ['DISS_' target '_bl_stimulus'];
 savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
 saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+
+% update the counter
 figure_counter = figure_counter + 1;
-clear data_visual fig ax lgd figure_name
 
 % plot baseline ppTMS-TS (SICI)
+fig = figure(figure_counter); hold on
 data_visual = squeeze(mean(GABA_DISS.baseline.SICI(:, :, :), 2));
-fig = figure(figure_counter);
-hold on
-title('Global dissimilarity: baseline SICI', 'FontSize', 16, 'FontWeight', 'bold')
-set(gca, 'fontsize', 12); xlabel('time (s)')
-ax = gca; ax.XColor = [0.5 0.5 0.5];
-plot(x, data_visual(1, :), 'Color', colours(6, :), 'LineWidth', 2.5)
-fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
-    colours(5, :) , 'facealpha', 0.5, 'linestyle', 'none');
-line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
-line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
-line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
-ylim([-0.75 1.75]); 
-lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
-lgd.FontSize = 12;
+plot_DISS(x, data_visual, 'Global dissimilarity: baseline SICI', colours([6 5], :), time_window)
 hold off
+
+% save the figure
 figure_name = ['DISS_' target '_bl_SICI'];
 savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
 saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+
+% update the counter
 figure_counter = figure_counter + 1;
-clear data_visual fig ax lgd figure_name
+clear data_visual figure_name
 
 % ----- pre-post medication -----
 % calculate DISS and spatial correlation C
@@ -572,33 +565,97 @@ clear m s p i diff
 % plot 
 for m = 1:length(medication)
     for s = 1:length(stimulus) 
+        % plot DISS
         data_visual = squeeze(mean(GABA_DISS.medication(:, m, s, :, :), 4));
-        fig = figure(figure_counter);
-        hold on
-        title(sprintf('Global dissimilarity: %s, %s', medication{m}, stimulus{s}), 'FontSize', 16, 'FontWeight', 'bold')
-        set(gca, 'fontsize', 12); xlabel('time (s)')
-        ax = gca; ax.XColor = [0.5 0.5 0.5];
-        plot(x, data_visual(1, :), 'Color', colours((m-1)*2 + 2, :), 'LineWidth', 2.5)
-        fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
-            colours((m-1)*2 + 1, :) , 'facealpha', 0.5, 'linestyle', 'none');
-        line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
-        line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
-        line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
-        ylim([-0.75 1.75]); 
-        lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
-        lgd.FontSize = 12;
+        fig = figure(figure_counter); hold on
+        plot_DISS(x, data_visual, sprintf('Global dissimilarity: %s, %s', medication{m}, stimulus{s}), ...
+            colours([(m-1)*2 + 2, (m-1)*2 + 1], :), time_window)
         hold off
+        
+        % save the figure
         figure_name = ['DISS_' target '_' medication{m} '_' stimulus{s}];
         savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
         saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+        
+        % update the counter
         figure_counter = figure_counter + 1;
     end
 end
-clear m s data_visual fig ax lgd figure_name
+clear m s data_visual figure_name
 
 % append new variables to the general MATLAB file
 save([folderpath '\' filename '.mat'], 'GABA_data_norm', 'GABA_DISS', '-append');
-clear data_temp
+clear data_temp fig 
+
+%% 6) export data for Ragu
+% ----- adjustable parameters -----
+folder_name = {'corrected' 'not_corrected'};
+% ----- adjustable parameters -----
+
+% create output folder
+for a = 1:length(folder_name)
+    mkdir([folderpath '\' filename '_export\' folder_name{a}])
+end
+clear a
+
+% write text files for Ragu --> corrected ppTMS TEPs
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus)
+            for p = 1:length(participant)
+                % choose data to write, remove 'eoi' channels
+                data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
+                
+                % define subject
+                if participant(p) < 10
+                    subj = ['S0' num2str(participant(p))];
+                else
+                    subj = ['S' num2str(participant(p))];
+                end
+                
+                % save as .csv               
+                name = ['GABA_' subj '_' medication{m} '_' stimulus{s} '_' time{t} '.csv']; 
+                writematrix(data, [folderpath '\' filename '_export\' folder_name{1} '\' name])
+            end
+        end
+    end
+end
+clear m t s p data subj name     
+
+% % write text files for Ragu --> uncorrected ppTMS TEPs
+% for m = 1:length(medication)
+%     for t = 1:length(time)
+%         for s = 1:length(stimulus)
+%             for p = 1:length(participant)
+%                 % choose data to write, remove 'eoi' channels
+%                 data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
+%                 
+%                 % define subject
+%                 if participant(p) < 10
+%                     subj = ['S0' num2str(participant(p))];
+%                 else
+%                     subj = ['S' num2str(participant(p))];
+%                 end
+%                 
+%                 % save as .csv               
+%                 name = ['GABA_' subj '_' medication{m} '_' stimulus{s} '_' time{t} '.csv']; 
+%                 writematrix(data, [folderpath '\' filename '_export\' folder_name{2} '\' name])
+%             end
+%         end
+%     end
+% end
+% clear m t s p data subj name   
+
+% create the montage file
+name = [folderpath '\' filename '_export\GABA_montage.xyz'];
+fileID = fopen(name, 'a');
+fprintf(fileID, '30\r\n');
+for a = 1:30
+    fprintf(fileID, '%.4f %.4f %.4f %s\r\n', ...
+        header.chanlocs(a).X, header.chanlocs(a).Y, header.chanlocs(a).Z, header.chanlocs(a).labels);
+end
+fclose(fileID)
+clear name fileID a folder_name
 
 %% ) peak widths
 % calculate narrow window parameters
@@ -888,6 +945,7 @@ ylim(yl)
 xlabel('time (s)')
 ylabel('potential (\muV)')
 end
+
 function [peak_x, peak_y] = gmfp_peaks(y, time_window, xstep, varargin)
 % check whether to plot labels (default)
 if ~isempty(varargin)
@@ -921,6 +979,7 @@ for a = 1:length(locs)
 end
 peak_y = double(peak_y);
 end
+
 function [p1, p2, f] = gmfp_plot_diff(x, y, time_window, colours)
 % calculate the time difference
 for g = 1:size(y, 2)
@@ -954,6 +1013,7 @@ ylim(yl)
 xlabel('time (s)')
 ylabel('power (\muV^2)')
 end
+
 function topo_plot(header, data, x_pos, x_start, map_lims)
 varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
 
@@ -975,6 +1035,7 @@ end;
 topoplot(vector2,chanlocs2,varargin{:});
 set(gcf,'color',[1 1 1]);
 end
+
 function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, TEPs, buffer, seed)
 % figure params 
 figure_name = ['Peak ' TEPs.peaks{k}] ;
@@ -1144,3 +1205,18 @@ pos_x = CP(1,1);
 end
 end
 
+function plot_DISS(x, data_visual, fig_title, colours, time_window)
+hold on
+title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
+set(gca, 'fontsize', 12); xlabel('time (s)')
+ax = gca; ax.XColor = [0.5 0.5 0.5];
+plot(x, data_visual(1, :), 'Color', colours(1, :), 'LineWidth', 2.5)
+fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+    colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
+line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
+line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
+line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+ylim([-0.75 1.75]); 
+lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
+lgd.FontSize = 12;
+end
