@@ -14,19 +14,25 @@
 %       - plots baseline TEPs from selected electrode, both conditions in
 %       one plot --> mean + CI
 % 
-% 3) calculate global mean field power from grand average
+% 3) calculate global field power from grand average
 %       - averages baseline and post-medication data from both sessions
-%       - calculates overall GMFP and plots it, adds topoplots for peak
+%       - calculates overall GFP and plots it, adds topoplots for peak
 %       times, saves the figure
 %       - automatically identifies local peaks within [0.01 0.25]s and
 %       saves peak latencies in the outcome structure
 % 
-% 4) define peak widths using grand average GMFP
+% 4) GFP - plot difference
+% 
+% 5) DISS
+% 
+% 6) export data for RAGU
+% 
+% ) define peak widths using grand average GMFP
 %       - for each stimulus separately, plots and saves the figure 
 %       - uses function findpeaks awith the 'halfheight' option
 %       - saves peak widths in the outcome structure
 % 
-% 5) determine electrodes of interest
+% ) determine electrodes of interest
 %       - uses GMFP peak latencies as default search points and signal from Cz 
 %       as starting peak point to track peak progress
 %       - averages across subjects
@@ -268,7 +274,7 @@ clear m s t e e_n fig lgd data_visual CI_visual figure_name P F yl
 save([folderpath '\' filename '.mat'], 'data_mean', 'data_CI', '-append');
 clear electrode 
 
-%% 3) GMFP - peak identification
+%% 3) GFP - peak identification
 % ----- decide output parameters -----
 labeled = 'off';
 max_peaks = 6;
@@ -277,7 +283,7 @@ if exist('GABA_data') ~= 1
     load([folderpath '\' filename '.mat'], 'GABA_data')
 end
 
-% calculate GMFP (exclude target and eoi channels)
+% calculate GFP (exclude target and eoi channels)
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus)
@@ -291,7 +297,7 @@ clear m t s
 header.chanlocs(31:end) = [];
 header.datasize(2) = 30;  
 
-% plot global GMFP per stimulus 
+% plot global GFP per stimulus 
 for s = 1:length(stimulus)
     % pool all conditions together
     for i = 1:size(GABA_GMFP, 4)
@@ -344,18 +350,23 @@ clear s i t e data_visual data_topoplot fig figure_name pos h_axis GABA_peaks
 save([folderpath '\' filename '.mat'], 'GABA_GMFP', '-append');
 clear labeled max_peaks 
 
-%% 4) GMFP - plot difference
+%% 4) GFP - plot difference
 % ----- decide output parameters -----
 TOI_peaks = [0.03 0.045 0.060 0.100 0.180];
 peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
 % ------------------------------------
+<<<<<<< Updated upstream
 % calculate GMFP for each subject/condition
+=======
+
+% calculate GFP for each subject/condition
+>>>>>>> Stashed changes
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus) 
             for p = 1:length(participant)
                 % calculate GMFP
-                GABA_GMFP_subject(m, t, s, p, :) = std(squeeze(GABA_data(m, t, s, p, 1:30, :)), 1);
+                GABA_GFP_subject(m, t, s, p, :) = std(squeeze(GABA_data(m, t, s, p, 1:30, :)), 1);
             end
         end
     end
@@ -367,7 +378,7 @@ lines = {':' '-'};
 for m = 1:length(medication)
     for s = [1 2]
         % load grand average data                
-        data_visual = squeeze(mean(squeeze(GABA_GMFP_subject(m, :, s, :, :)), 2));
+        data_visual = squeeze(mean(squeeze(GABA_GFP_subject(m, :, s, :, :)), 2));
 
         % launch the figure
         fig = figure(figure_counter);
@@ -464,16 +475,20 @@ end
 clear lines s m t fig h_axis yl xl F lgd pos k n  P R L descript figure_name e i
 
 % append new variables to the general MATLAB file
-save([folderpath '\' filename '.mat'], 'GABA_GMFP_subject', '-append');
+save([folderpath '\' filename '.mat'], 'GABA_GFP_subject', '-append');
 clear TOI TOI_peaks peaks
 
 %% 5) DISS
+<<<<<<< Updated upstream
 % load data if not loaded
 if exist('GABA_GMFP_subject') ~= 1
     load([folderpath '\' filename '.mat'], 'GABA_GMFP_subject')
 end
 
 % normalize data by GMFP
+=======
+% normalize data by GFP
+>>>>>>> Stashed changes
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus) 
@@ -656,6 +671,69 @@ for a = 1:30
 end
 fclose(fileID)
 clear name fileID a folder_name
+
+%% 6) export data for Ragu
+% create output folder
+for a = 1:length(folder_name)
+    mkdir(folderpath, [filename '_export'])
+end
+
+% write text files for Ragu 
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus)
+            for p = 1:length(participant)
+                % choose data to write, remove 'target' channel
+                data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
+                
+                % define subject
+                if subject(s) < 10
+                    subj = ['S0' num2str(subject(s))];
+                else
+                    subj = ['S' num2str(subject(s))];
+                end
+                
+                % save as .csv               
+                filename = ['AGSICI_' subj '_' position{p} '_' current{c} '_' intensity{i}(end-2:end) '.csv']; 
+                writematrix(data, [folder_exp '\' folder_name{1} '\' filename])
+            end
+        end
+    end
+end
+clear p c i s data subj filename     
+
+% write text files for Ragu --> average over intensities
+for p = 1:length(position)
+    for c = 1:length(current)
+        for s = 1:length(subject)
+            % choose data to write, remove 'target' channel
+            data = squeeze(mean(AGSICI_data(p, c, :, s, 1:32, :), 3))';
+
+            % define subject
+            if subject(s) < 10
+                subj = ['S0' num2str(subject(s))];
+            else
+                subj = ['S' num2str(subject(s))];
+            end
+
+            % save as .csv               
+            filename = ['AGSICI_' subj '_' position{p} '_' current{c} '.csv']; 
+            writematrix(data, [folder_exp '\' folder_name{2} '\' filename])
+        end
+    end
+end
+clear p c s data subj filename     
+
+% create the montage file
+filename = [folder_exp '\AGSICI_montage.xyz'];
+fileID = fopen(filename, 'a');
+fprintf(fileID, '32\r\n');
+for a = 1:32
+    fprintf(fileID, '%.4f %.4f %.4f %s\r\n', ...
+        header.chanlocs(a).X, header.chanlocs(a).Y, header.chanlocs(a).Z, header.chanlocs(a).labels);
+end
+fclose(fileID)
+clear filename fileID a folder_name
 
 %% ) peak widths
 % calculate narrow window parameters
