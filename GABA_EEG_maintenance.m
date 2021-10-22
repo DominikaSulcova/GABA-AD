@@ -126,4 +126,33 @@ for p = 1:length(participant)
 end
 clear p t e 
 
+%% rename dataset
+% dataset
+participant = 1:20;
+medication = {'placebo' 'alprazolam'}; 
+time = {'pre' 'post'};
+
+% loop through datasets
+for m = 1:length(medication)
+    for s = 3
+        for t = 1:length(time)
+            for p = 1:length(participant)
+                % define subject
+                if participant(p) < 10
+                    subj = ['S0' num2str(participant(p))];
+                else
+                    subj = ['S' num2str(participant(p))];
+                end
+                
+                % load dataset
+                name = ['GABA_YC_' subj '_M1_' medication{m} '_' stimulus_new{s} '_' time{t}];
+                data = readmatrix([name '.csv']);
+                
+                % load with new name
+                writematrix(data, [pwd '\' name '_corrected.csv'])                
+            end
+        end
+    end
+end
+
 
