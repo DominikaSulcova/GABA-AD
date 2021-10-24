@@ -90,7 +90,7 @@ z = 1.96;
 % visualization
 figure_counter = 1;
 col = [1, 0.55, 0.55];
-load('colours.mat'); load('colours2.mat'); 
+load('colours.mat');
 
 % in case of repeted use:
 load('rsEEG_data_high.mat'); load('rsEEG_data_low.mat') 
@@ -919,68 +919,6 @@ end
 clear m t c r b rows
 disp(['Datasize: ' num2str(size(data_beta))])
 
-% normalize beta1 amplitude to baseline - only eyes open
-for m = 1:length(medication)
-    for r = 1:numel(ROI)
-        for p = 1:length(participant)
-            amp_baseline = squeeze(data_beta(m, 1, 1, r, 1, p));
-            amp_raw = squeeze(data_beta(m, 2, 1, r, 1, p));
-            amp_norm(m, r, p) = amp_raw / amp_baseline * 100;
-        end
-    end
-end
-clear m r p amp_baseline amp_raw
-
-% plot relative amplitude by fband
-% launch the figure
-fig = figure(figure_counter);
-hold on
-
-% add no-change line
-ylim([90 200])
-xlim([0.75 size(amp_norm, 2) + 0.25])
-line([0.75 size(amp_norm, 2) + 0.25], [100, 100], 'Color', [0.75 0.75 0.75], ...
-    'LineStyle', '--', 'LineWidth', 2);
-
-% plot data with errorbars
-x = 1:size(amp_norm, 2);    
-for m = 1:size(amp_norm, 1)  % medication
-    % calculate the data and 95% CI
-    for r = 1:size(amp_norm, 2); % ROIs  
-        y(r) = mean(squeeze(amp_norm(m, r, :)));
-        CI(r) = std(squeeze(amp_norm(m, r, :))) / sqrt(length(participant)) * z;
-    end
-
-    % plot
-    err(m) = errorbar(x, y, CI);
-
-    % add parameters
-    err(m).Color = colours2((m - 1)*2 + 2, :);
-    err(m).LineWidth = 1.2;
-    err(m).Marker = 'o';
-    err(m).MarkerFaceColor = colours2((m - 1)*2 + 2, :);
-    err(m).MarkerSize = 10;
-end
-
-% set other parameters
-fig_name = 'Beta 1 = sigma band, eyes open';
-title(fig_name, 'FontWeight', 'bold', 'FontSize', 16)
-set(gca, 'Fontsize', 14)
-legend(err, medication, 'Location', 'northeast', 'fontsize', 14, 'EdgeColor', 'none')
-xlabel('region of interest')
-set(gca, 'xtick', 1:size(amp_norm, 2), 'xticklabel', {'frontal' 'central' 'left' 'right' 'occipital'})
-ylabel('relative amplitude (% baseline)')
-hold off
-
-% save figure
-fig_name = 'rsEEG_change_sigma';
-savefig([fig_name '.fig'])
-saveas(fig, [fig_name '.png'])
-
-% update counter
-figure_counter = figure_counter + 1;
-clear f c m r x y CI err fig fig_name sem_visual amp_norm 
-
 % extract amplitude from all beta bands --> central region, eyes open
 beta_fbands{end + 1} = 'broad';
 for m = 1:length(medication)
@@ -1001,10 +939,159 @@ for m = 1:length(medication)
     end
 end
 save('beta.mat', 'beta'); save('beta_change.mat', 'beta_change'); 
+clear m t p b
 
-clear m t p b data_beta
+% plot relative amplitude by fband
+col = colours([2 4], :);
+beta_fbands_range = {'low beta = sigma peak' 'high beta' 'broad band beta'};
+for b = 1:length(beta_fbands)
+    % choose the data
+    data_visual = [];
+    for m = 1:length(medication)
+        data_i = squeeze(beta_change(m, :, b))';
+        data_visual = cat(2, data_visual, data_i);
+    end
+    
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
 
-%% 9) alpha attenuation coeficient  
+    % plot group boxplot
+    boxplot(data_visual, 'color', col)
+    
+    % add zero line
+    xl = get(gca, 'xlim');
+    h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
+
+    % plot the lines
+    for p = 1:length(participant)
+        p_line(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+            'Color', [0.75, 0.75, 0.75],...
+            'MarkerSize', 10,...
+            'MArkerEdge', 'none');
+        hold on
+    end
+
+    % plot the markers
+    for s = 1:size(data_visual, 2)
+        scat(s) = scatter(repelem(s, length(participant)), data_visual(:, s),...
+            75, col(s, :), 'filled');
+        hold on
+    end
+
+    % add parameters
+    figure_title = ['BETA POWER CHANGE: ' beta_fbands_range{b}];
+    figure_name = ['rsEEG_beta_change_' beta_fbands{b}];
+    yl = get(gca, 'ylim');
+    set(gca, 'xtick', [1 2], 'xticklabel', {'placebo' 'alprazolam'})
+    set(gca, 'Fontsize', 16)
+    title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+    xlabel('medication'); ylabel('power change (% baseline)');
+    ylim([yl(1), yl(2)])
+    hold off
+
+    % save figure
+    savefig([figure_name '.fig'])
+    saveas(fig, [figure_name '.png'])
+
+    % update counter
+    figure_counter = figure_counter + 1;
+    clear b m fig data_i data_visual figure_title figure_name yl xl p p_line h s scat 
+end
+clear col beta_fbands_range 
+
+%% 8) delta band 
+% choose data
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for c = 1:length(condition)
+            for r = 1:numel(ROI)
+                % extract amplitude of delta band
+                rows = (categorical(fband_amplitude.medication) == medication{m} & ...
+                    categorical(fband_amplitude.time) == time{t} & ...
+                    categorical(fband_amplitude.condition) == condition{c} & ...
+                    categorical(fband_amplitude.fband) == 'delta');
+                data_delta(m, t, c, r, :) = fband_amplitude{rows, ROI(r).area};
+            end
+        end
+    end 
+end
+clear m t c r rows
+disp(['Datasize: ' num2str(size(data_delta))])
+
+% extract delta amplitude --> occipital region, eyes open
+for m = 1:length(medication)
+    % raw delta
+    for t = 1:length(time)
+        for p = 1:length(participant)
+            delta(m, t, p) = squeeze(data_delta(m, t, 1, 5, p));
+        end
+    end
+    
+    % change --> normalized beta
+    for p = 1:length(participant)
+        delta_change(m, p) = (delta(m, 2, p)/delta(m, 1, p))*100 - 100;
+    end
+end
+save('delta.mat', 'delta'); save('delta_change.mat', 'delta_change'); 
+clear m t p 
+
+% plot relative amplitude 
+% choose the data
+data_visual = [];
+for m = 1:length(medication)
+    data_i = squeeze(delta_change(m, :))';
+    data_visual = cat(2, data_visual, data_i);
+end
+
+% launch the figure
+fig = figure(figure_counter);
+hold on
+
+% plot group boxplot
+col = colours([2 4], :);
+boxplot(data_visual, 'color', col)
+
+% add zero line
+xl = get(gca, 'xlim');
+h = line([xl(1) xl(2)], [0, 0], 'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 2);
+
+% plot the lines
+for p = 1:length(participant)
+    p_line(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+        'Color', [0.75, 0.75, 0.75],...
+        'MarkerSize', 10,...
+        'MArkerEdge', 'none');
+    hold on
+end
+
+% plot the markers
+for s = 1:size(data_visual, 2)
+    scat(s) = scatter(repelem(s, length(participant)), data_visual(:, s),...
+        75, col(s, :), 'filled');
+    hold on
+end
+
+% add parameters
+figure_title = 'DELTA POWER CHANGE';
+figure_name = 'rsEEG_delta_change';
+yl = get(gca, 'ylim');
+set(gca, 'xtick', [1 2], 'xticklabel', {'placebo' 'alprazolam'})
+set(gca, 'Fontsize', 16)
+title(figure_title, 'FontWeight', 'bold', 'FontSize', 18)
+xlabel('medication'); ylabel('power change (% baseline)');
+ylim([yl(1), yl(2)])
+hold off
+
+% save figure
+savefig([figure_name '.fig'])
+saveas(fig, [figure_name '.png'])
+
+% update counter
+figure_counter = figure_counter + 1;
+clear col fig data_i data_visual figure_title figure_name yl xl p p_line h s scat  
+
+%% 10) alpha attenuation coeficient  
 % ----- extract AAC -----
 % choose data - individual alpha subbands + broad alpha band
 alpha_fbands = {'alpha1' 'alpha2' 'alpha3'};
@@ -1128,7 +1215,7 @@ for a = 1:length(alpha_fbands)
     end
 
     % plot group boxplot
-    col = colours2([2 4], :);
+    col = colours([2 4], :);
     fig = figure(figure_counter);        
     boxplot(data_visual, 'color', col)
     hold on

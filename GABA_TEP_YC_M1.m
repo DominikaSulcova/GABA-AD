@@ -1,4 +1,4 @@
-%% GABA-AD: TMS-EVOKED POTENTIALS
+%% GABA-AD: TMS-EVOKED POTENTIALS - PRIMARY MOTOR CORTEX
 % Written by Dominika for GABA-AD project (2020-21)
 % 
 % % Colection of scripts to analyse preprocessed TMS-EEG data: 
@@ -25,54 +25,30 @@
 % 
 % 5) DISS
 % 
-% 6) export data for RAGU
+% 2) export data for RAGU
+%   - removes 'target' channel
+%   - saves time-series in a .csv table, timepoint x channel (export folder)
+%   - creates an .xyz file with the electrode montage
 % 
-% ) define peak widths using grand average GMFP
-%       - for each stimulus separately, plots and saves the figure 
-%       - uses function findpeaks awith the 'halfheight' option
-%       - saves peak widths in the outcome structure
-% 
-% ) determine electrodes of interest
-%       - uses GMFP peak latencies as default search points and signal from Cz 
-%       as starting peak point to track peak progress
-%       - averages across subjects
-%       - identifies 3 electrodes with the highest average amplitude for
-%       each peak, plots the  
-
-
-
 
 %% parameters
 clear all; clc
 
 % ----- adjustable parameters -----
 % dataset
+prefix = 'GABA';
 group = 'YC';
 target = 'M1';
 participant = 1:20;
 medication = {'placebo' 'alprazolam'}; 
 time = {'pre' 'post'};
+stimulus = {'CS' 'TS' 'ppTMS'};
 
 % visualization 
 time_window = [-0.05, 0.3];
 z = 1.96;
 alpha = 0.2;
 % --------------------------------
-
-% dataset parameters
-stimulus = {'CS' 'TS' 'ppTMS'};
-prefix = 'eois crop avg final_dataset';
-load([prefix ' ' stimulus{1} ' ' group num2str(participant(1)) ' ' medication{1} ' ' time{1} ' ' target '.lw6'], '-mat')
-labels.CS = {header.chanlocs.labels};
-load([prefix ' ' stimulus{2} ' ' group num2str(participant(1)) ' ' medication{1} ' ' time{1} ' ' target '.lw6'], '-mat')
-labels.TS = {header.chanlocs.labels};
-
-% visualization calculated params
-figure_counter = 1;
-xstep = header.xstep; 
-x = [time_window(1):xstep:time_window(2)];
-x_start = (time_window(1) - header.xstart)/xstep;
-x_end = (time_window(2) - header.xstart)/xstep;
 
 % check for colour scheme
 answer = questdlg('Do you want to choose a new colour scheme?', 'Colour scheme', 'YES', 'NO', 'NO'); 
@@ -97,41 +73,60 @@ clear a answer
 
 % create output folders
 filename = ['GABA_' group '_' target];
-folderpath = [pwd '\' filename];
-if ~exist(folderpath) 
-    mkdir(folderpath)
-    mkdir(folderpath, [filename '_figures'])
-end      
+folderpath = uigetdir;
+output_file = [folderpath '\' filename '.mat'];
+
+folder_export = [folderpath '\GABA_' group '_export'];
+if ~exist(folder_export)
+    mkdir(folder_export)
+end
+
+folder_figures = [folderpath '\GABA_' group '_figures'];
+if ~exist(folder_figures)
+    mkdir(folder_figures)  
+end
+
+% header
+load([prefix ' ' group ' 01 ' target ' ' medication{1} ' ' time{1} ' ' stimulus{3} '.lw6'], '-mat')
+labels = {header.chanlocs.labels};
+
+% visualization calculated params
+figure_counter = 1;
+xstep = header.xstep; 
+x = [time_window(1):xstep:time_window(2)];
+x_start = (time_window(1) - header.xstart)/xstep;
+x_end = (time_window(2) - header.xstart)/xstep;
 
 %% 1) extract individual data
-% load data --> corrected ppTMS TEPs
-n = length(labels.TS) - length(labels.CS);
+% load data --> uncorrected ppTMS TEPs
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus)
             for p = 1:length(participant)
+                % define participant
+                if p < 10
+                    subj = ['0' num2str(participant(p))];
+                else
+                    subj = num2str(participant(p));
+                end
+    
                 % load individual dataset
-                load([prefix ' ' stimulus{s} ' ' group num2str(participant(p)) ' ' medication{m} ' ' time{t} ' ' target '.mat'])
+                load([prefix ' ' group ' ' subj ' ' target ' ' medication{m} ' ' time{t} ' ' stimulus{s} '.mat'])
 
                 % append the data in the data matrix
-                GABA_data(m, t, s, p, [1:size(data, 2)], :) = squeeze(data(:, :, :, :, :, x_start:x_end));   
-
-                % fill in zeros if n of electrodes doesn't match 
-                if n > 0 & strcmp(stimulus{s}, 'CS') | n < 0 & strcmp(stimulus{s}, 'TS')
-                    GABA_data(m, t, s, p, [size(data, 2)+1: size(data, 2)+n], :) = zeros(n, size(GABA_data, 6));
-                end                                
+                GABA_data(m, t, s, p, :, :) = squeeze(data(:, :, :, :, :, x_start:x_end));                                  
             end
         end
     end
 end
-clear m t s p data n
+clear m t s p data subj
 disp(['Data import finished. Datasize: ' num2str(size(GABA_data))])
 
 % save dataset to the global MATLAB file
-if ~exist([folderpath '\' filename '.mat']) 
-    save([folderpath '\' filename '.mat'], 'GABA_data');
+if ~exist() 
+    save(output_file, 'GABA_data');
 else
-    save([folderpath '\' filename '.mat'], 'GABA_data', '-append');
+    save(output_file, 'GABA_data', '-append');
 end
 
 %% 2) preliminary visualization 
@@ -149,8 +144,8 @@ for m = 1:length(medication)
         for s = 1:length(stimulus)
             for e = 1:size(GABA_data, 5)
                 for i = 1:size(GABA_data, 6)
-                    data_mean(m, t, s, e, i) = mean(squeeze(GABA_data(m, t, s, :, e, i)));
-                    data_CI(m, t, s, e, i) = (std(squeeze(GABA_data(m, t, s, :, e, i)))/sqrt(length(participant))) * z;
+                    GABA_data_mean(m, t, s, e, i) = mean(squeeze(GABA_data(m, t, s, :, e, i)));
+                    GABA_data_CI(m, t, s, e, i) = (std(squeeze(GABA_data(m, t, s, :, e, i)))/sqrt(length(participant))) * z;
                 end
             end
         end
@@ -162,12 +157,11 @@ clear m t s e i
 for e = 1:length(electrode) 
     for s = [1 2]
         % identify the electrode
-        statement = ['e_n = find(contains(labels.' stimulus{s} ', electrode{e}));'];
-        eval(statement)
+        e_n = find(contains(labels, electrode{e}));
         
         % prepare data
-        data_visual = squeeze(data_mean(:, 1, s, e_n, :));
-        CI_visual = squeeze(data_CI(:, 1, s, e_n, :));
+        data_visual = squeeze(GABA_data_mean(:, 1, s, e_n, :));
+        CI_visual = squeeze(GABA_data_CI(:, 1, s, e_n, :));
 
         % launch the figure
         fig = figure(figure_counter);
@@ -204,8 +198,8 @@ for e = 1:length(electrode)
 
         % name and save figure
         figure_name = ['TEP_' target '_bl_'  stimulus{s} '_' electrode{e}];
-        savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-        saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
 
         % update figure counter
         figure_counter = figure_counter + 1 ;
@@ -218,12 +212,11 @@ for e = 1:length(electrode)
     for m = 1:length(medication)
         for s = [1 2]
             % identify the electrode
-            statement = ['e_n = find(contains(labels.' stimulus{s} ', electrode{e}));'];
-            eval(statement)
+            e_n = find(contains(labels, electrode{e}));
 
             % prepare data
-            data_visual = squeeze(data_mean(m, :, s, e_n, :));
-            CI_visual = squeeze(data_CI(m, :, s, e_n, :));
+            data_visual = squeeze(GABA_data_mean(m, :, s, e_n, :));
+            CI_visual = squeeze(GABA_data_CI(m, :, s, e_n, :));
 
             % launch the figure
             fig = figure(figure_counter);
@@ -260,8 +253,8 @@ for e = 1:length(electrode)
 
             % name and save figure
             figure_name = ['TEP_' target '_'  stimulus{s} '_' medication{m} '_' electrode{e}];
-            savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-            saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+            savefig([folder_figures '\' figure_name '.fig'])
+            saveas(fig, [folder_figures '\' figure_name '.png'])
 
             % update figure counter
             figure_counter = figure_counter + 1 ;
@@ -271,10 +264,27 @@ end
 clear m s t e e_n fig lgd data_visual CI_visual figure_name P F yl
 
 % save dataset to the global MATLAB file
-save([folderpath '\' filename '.mat'], 'data_mean', 'data_CI', '-append');
+save(output_file, 'GABA_data_mean', 'GABA_data_CI', '-append');
 clear electrode 
 
-%% 3) GFP - peak identification
+%% 3) GFP 
+% compute individual GFP
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus)
+            for p = 1:length(participant)
+                % calculate GFP (exclude target channel)
+                GABA_GFP(m, t, s, p, :) = std(squeeze(GABA_data(m, t, s, p, 1:30, :)), 1);  
+            end
+        end
+    end
+end
+clear m t s p
+
+% append new variable to the general MATLAB file
+save(output_file, 'GABA_GFP', '-append');
+
+%% 4) GFP - peak identification
 % ----- decide output parameters -----
 labeled = 'off';
 max_peaks = 6;
@@ -283,11 +293,11 @@ if exist('GABA_data') ~= 1
     load([folderpath '\' filename '.mat'], 'GABA_data')
 end
 
-% calculate GFP (exclude target and eoi channels)
+% calculate mean GFP (exclude target channel)
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus)
-            GABA_GMFP(m, t, s, :) = std(squeeze(data_mean(m, t, s, 1:30, :)), 1);  
+            GABA_GFP_mean(m, t, s, :) = std(squeeze(GABA_data_mean(m, t, s, 1:30, :)), 1);  
         end
     end 
 end
@@ -300,8 +310,8 @@ header.datasize(2) = 30;
 % plot global GFP per stimulus 
 for s = 1:length(stimulus)
     % pool all conditions together
-    for i = 1:size(GABA_GMFP, 4)
-        data_visual(i) = mean(GABA_GMFP(:, :, s, i), 'all');
+    for i = 1:size(GABA_GFP_mean, 4)
+        data_visual(i) = mean(GABA_GFP_mean(:, :, s, i), 'all');
     end
 
     % launch the figure
@@ -310,13 +320,13 @@ for s = 1:length(stimulus)
 
     % extract peak latencies
     h_axis(1) = subplot(3, max_peaks, [1 : 2*max_peaks]);
-    GABA_peaks = gmfp_plot(x, data_visual, time_window, xstep, labeled, 'max_peaks', max_peaks);
+    GABA_peaks = gfp_plot(x, data_visual, time_window, xstep, labeled, 'max_peaks', max_peaks);
     title(['M1 - ' stimulus{s} ', all conditions: GMFP'], 'fontsize', 16, 'fontweight', 'bold')
 
     % choose data for topoplots 
     for e = 1:30
-        for i = 1:size(data_mean, 5)
-            data_topoplot(1, e, 1, 1, 1, i) = mean(data_mean(:, :, s, e, i), 'all');
+        for i = 1:size(GABA_data_mean, 5)
+            data_topoplot(1, e, 1, 1, 1, i) = mean(GABA_data_mean(:, :, s, e, i), 'all');
         end
     end
 
@@ -337,9 +347,9 @@ for s = 1:length(stimulus)
     hold off
 
     % save figure
-    figure_name = ['GMFP_' target '_' stimulus{s}];
-    savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-    saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+    figure_name = ['GFP_' target '_' stimulus{s}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
 
     % update figure counteer
     figure_counter = figure_counter + 1;
@@ -347,38 +357,20 @@ end
 clear s i t e data_visual data_topoplot fig figure_name pos h_axis GABA_peaks
 
 % append new variables to the general MATLAB file
-save([folderpath '\' filename '.mat'], 'GABA_GMFP', '-append');
+save(output_file, 'GABA_GFP_mean', '-append');
 clear labeled max_peaks 
 
-%% 4) GFP - plot difference
+%% 5) GFP - plot difference
 % ----- decide output parameters -----
-TOI_peaks = [0.03 0.045 0.060 0.100 0.180];
-peaks = {'P30' 'N45' 'P60' 'N100' 'P180'};
+TOI_peaks = [0.017 0.03 0.045 0.060 0.100 0.180];
+peaks = {'N17' 'P30' 'N45' 'P60' 'N100' 'P180'};
 % ------------------------------------
-<<<<<<< Updated upstream
-% calculate GMFP for each subject/condition
-=======
-
-% calculate GFP for each subject/condition
->>>>>>> Stashed changes
-for m = 1:length(medication)
-    for t = 1:length(time)
-        for s = 1:length(stimulus) 
-            for p = 1:length(participant)
-                % calculate GMFP
-                GABA_GFP_subject(m, t, s, p, :) = std(squeeze(GABA_data(m, t, s, p, 1:30, :)), 1);
-            end
-        end
-    end
-end
-clear m t s p 
-
 % plot baseline vs. post-medication
 lines = {':' '-'};
 for m = 1:length(medication)
     for s = [1 2]
         % load grand average data                
-        data_visual = squeeze(mean(squeeze(GABA_GFP_subject(m, :, s, :, :)), 2));
+        data_visual = squeeze(mean(squeeze(GABA_GFP(m, :, s, :, :)), 2));
 
         % launch the figure
         fig = figure(figure_counter);
@@ -387,7 +379,7 @@ for m = 1:length(medication)
             'FontSize', 16, 'FontWeight', 'bold')
         set(gca, 'fontsize', 12)
         xlabel('time (s)')
-        ylabel('GMFP (\muV)')
+        ylabel('GFP (\muV)')
         hold on
         
         % set limits of the figure
@@ -406,7 +398,7 @@ for m = 1:length(medication)
             colours((m-1)*2 + 1, :), 'linestyle', 'none', 'facealpha', 0.5);
         F.Annotation.LegendInformation.IconDisplayStyle = 'off';
 
-        % plot GMFP
+        % plot GFP
         for t = 1:length(time)
             % plot signal
             plot(x, data_visual(t, :), 'Parent', h_axis(1), ...
@@ -464,38 +456,30 @@ for m = 1:length(medication)
         fig.Position = [pos(1) pos(2)-200 660 550];
 
         % save figure
-        figure_name = ['GMFP_' target '_' stimulus{s} '_' medication{m}];
-        savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-        saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+        figure_name = ['GFP_' target '_' stimulus{s} '_' medication{m}];
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
 
         % update figure counteer
         figure_counter = figure_counter + 1;
     end
 end
-clear lines s m t fig h_axis yl xl F lgd pos k n  P R L descript figure_name e i
-
-% append new variables to the general MATLAB file
-save([folderpath '\' filename '.mat'], 'GABA_GFP_subject', '-append');
-clear TOI TOI_peaks peaks
+clear peaks lines s m t fig h_axis yl xl F lgd pos k n  P R L descript figure_name e i
 
 %% 5) DISS
-<<<<<<< Updated upstream
 % load data if not loaded
-if exist('GABA_GMFP_subject') ~= 1
-    load([folderpath '\' filename '.mat'], 'GABA_GMFP_subject')
+if exist('GABA_GFP') ~= 1
+    load([folderpath '\' filename '.mat'], 'GABA_GFP_subject')
 end
 
-% normalize data by GMFP
-=======
 % normalize data by GFP
->>>>>>> Stashed changes
 for m = 1:length(medication)
     for t = 1:length(time)
         for s = 1:length(stimulus) 
             for p = 1:length(participant)
                 for i = 1:size(GABA_data, 6)
                     % devide data at each time point by GMFP
-                    GABA_data_norm(m, t, s, p, :, i) = squeeze(GABA_data(m, t, s, p, 1:30, i)) / GABA_GMFP_subject(m, t, s, p, i);
+                    GABA_data_norm(m, t, s, p, :, i) = squeeze(GABA_data(m, t, s, p, 1:30, i)) / GABA_GFP(m, t, s, p, i);
                 end
             end
         end
@@ -541,8 +525,8 @@ hold off
 
 % save the figure
 figure_name = ['DISS_' target '_bl_stimulus'];
-savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+savefig([folder_figures '\' figure_name '.fig'])
+saveas(fig, [folder_figures '\' figure_name '.png'])
 
 % update the counter
 figure_counter = figure_counter + 1;
@@ -555,8 +539,8 @@ hold off
 
 % save the figure
 figure_name = ['DISS_' target '_bl_SICI'];
-savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+savefig([folder_figures '\' figure_name '.fig'])
+saveas(fig, [folder_figures '\' figure_name '.png'])
 
 % update the counter
 figure_counter = figure_counter + 1;
@@ -589,8 +573,8 @@ for m = 1:length(medication)
         
         % save the figure
         figure_name = ['DISS_' target '_' medication{m} '_' stimulus{s}];
-        savefig([folderpath '\' filename '_figures\' figure_name '.fig'])
-        saveas(fig, [folderpath '\' filename '_figures\' figure_name '.png'])
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
         
         % update the counter
         figure_counter = figure_counter + 1;
@@ -599,27 +583,17 @@ end
 clear m s data_visual figure_name
 
 % append new variables to the general MATLAB file
-save([folderpath '\' filename '.mat'], 'GABA_data_norm', 'GABA_DISS', '-append');
+save(output_file, 'GABA_data_norm', 'GABA_DISS', '-append');
 clear data_temp fig 
 
 %% 6) export data for Ragu
-% ----- adjustable parameters -----
-folder_name = {'corrected' 'not_corrected'};
-% ----- adjustable parameters -----
-
-% create output folder
-for a = 1:length(folder_name)
-    mkdir([folderpath '\' filename '_export\' folder_name{a}])
-end
-clear a
-
-% write text files for Ragu --> corrected ppTMS TEPs
+% write text files for Ragu --> uncorrected ppTMS TEPs
 for m = 1:length(medication)
     for t = 1:length(time)
-        for s = 1:length(stimulus)
+        for s = 3
             for p = 1:length(participant)
-                % choose data to write, remove 'eoi' channels
-                data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
+%                 % choose data to write, remove 'eoi' channels
+%                 data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
                 
                 % define subject
                 if participant(p) < 10
@@ -628,41 +602,23 @@ for m = 1:length(medication)
                     subj = ['S' num2str(participant(p))];
                 end
                 
+                % load the data
+                name_old = ['GABA ' group ' ' subj(2:end) ' ' target ' ' medication{m} ' ' time{t} ' ' stimulus{s} '.mat'];
+                load(name_old)
+                data = squeeze(data(:, 1:30, :, :, :, x_start:x_end))';
+                
                 % save as .csv               
-                name = ['GABA_' subj '_' medication{m} '_' stimulus{s} '_' time{t} '.csv']; 
-                writematrix(data, [folderpath '\' filename '_export\' folder_name{1} '\' name])
+                name = ['GABA_' group '_' subj '_' target '_' medication{m} '_' stimulus{s} '_' time{t} '.csv']; 
+                writematrix(data, [folder_export '\' name])
+                
             end
         end
     end
 end
 clear m t s p data subj name     
 
-% % write text files for Ragu --> uncorrected ppTMS TEPs
-% for m = 1:length(medication)
-%     for t = 1:length(time)
-%         for s = 1:length(stimulus)
-%             for p = 1:length(participant)
-%                 % choose data to write, remove 'eoi' channels
-%                 data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
-%                 
-%                 % define subject
-%                 if participant(p) < 10
-%                     subj = ['S0' num2str(participant(p))];
-%                 else
-%                     subj = ['S' num2str(participant(p))];
-%                 end
-%                 
-%                 % save as .csv               
-%                 name = ['GABA_' subj '_' medication{m} '_' stimulus{s} '_' time{t} '.csv']; 
-%                 writematrix(data, [folderpath '\' filename '_export\' folder_name{2} '\' name])
-%             end
-%         end
-%     end
-% end
-% clear m t s p data subj name   
-
 % create the montage file
-name = [folderpath '\' filename '_export\GABA_montage.xyz'];
+name = [folder_export '\GABA_montage.xyz'];
 fileID = fopen(name, 'a');
 fprintf(fileID, '30\r\n');
 for a = 1:30
@@ -672,293 +628,651 @@ end
 fclose(fileID)
 clear name fileID a folder_name
 
-%% 6) export data for Ragu
-% create output folder
-for a = 1:length(folder_name)
-    mkdir(folderpath, [filename '_export'])
-end
-
-% write text files for Ragu 
+%% 7) SICI
+% ----- decide output parameters -----
+electrode = {'C3' 'FC1'};
+linestyle = {'-' ':'}
+% ------------------------------------
+% calculate individual SICI
+GABA_SICI = struct;
 for m = 1:length(medication)
     for t = 1:length(time)
-        for s = 1:length(stimulus)
-            for p = 1:length(participant)
-                % choose data to write, remove 'target' channel
-                data = squeeze(GABA_data(m, t, s, p, 1:30, :))';
-                
-                % define subject
-                if subject(s) < 10
-                    subj = ['S0' num2str(subject(s))];
-                else
-                    subj = ['S' num2str(subject(s))];
-                end
-                
-                % save as .csv               
-                filename = ['AGSICI_' subj '_' position{p} '_' current{c} '_' intensity{i}(end-2:end) '.csv']; 
-                writematrix(data, [folder_exp '\' folder_name{1} '\' filename])
+        for p = 1:length(participant)
+            for e = 1:size(GABA_data, 5)
+                % calculate GFP (exclude target channel)
+                GABA_SICI.individual(m, t, p, e, :) = squeeze(GABA_data(m, t, 3, p, e, :)) - squeeze(GABA_data(m, t, 2, p, e, :));  
             end
         end
     end
 end
-clear p c i s data subj filename     
+clear m t p e
 
-% write text files for Ragu --> average over intensities
-for p = 1:length(position)
-    for c = 1:length(current)
-        for s = 1:length(subject)
-            % choose data to write, remove 'target' channel
-            data = squeeze(mean(AGSICI_data(p, c, :, s, 1:32, :), 3))';
-
-            % define subject
-            if subject(s) < 10
-                subj = ['S0' num2str(subject(s))];
-            else
-                subj = ['S' num2str(subject(s))];
+% calculate mean SICI
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for e = 1:size(GABA_data, 5)
+            for i = 1:size(GABA_data, 6)
+                GABA_SICI.mean(m, t, e, i) = mean(squeeze(GABA_SICI.individual(m, t, :, e, i)));
+                GABA_SICI.CI(m, t, e, i) = (std(squeeze(GABA_SICI.individual(m, t, :, e, i)))/sqrt(length(participant))) * z;
             end
-
-            % save as .csv               
-            filename = ['AGSICI_' subj '_' position{p} '_' current{c} '.csv']; 
-            writematrix(data, [folder_exp '\' folder_name{2} '\' filename])
-        end
-    end
+        end  
+    end 
 end
-clear p c s data subj filename     
+clear m t e i 
 
-% create the montage file
-filename = [folder_exp '\AGSICI_montage.xyz'];
-fileID = fopen(filename, 'a');
-fprintf(fileID, '32\r\n');
-for a = 1:32
-    fprintf(fileID, '%.4f %.4f %.4f %s\r\n', ...
-        header.chanlocs(a).X, header.chanlocs(a).Y, header.chanlocs(a).Z, header.chanlocs(a).labels);
-end
-fclose(fileID)
-clear filename fileID a folder_name
-
-%% ) peak widths
-% calculate narrow window parameters
-x_start_narrow = (0.01 - time_window(1))/xstep;
-x_end_narrow = (0.25 - time_window(1))/xstep;
-x_narrow = [0.01:xstep:0.25];
-
-% loop through stimuli
-for s = 1:length(stimulus)
-    % average data across conditions
-    for i = 1:length(x_narrow)
-        data_visual(i) = mean(GABA_GMFP(:, :, s, x_start_narrow + (i - 1)), 'all');
-    end
-        
-    % identify peak widths
-    [P, L, GABA_peaks(s).widths, R] = findpeaks(data_visual, 'Annotate','extents', 'WidthReference', 'halfheight');
-    GABA_peaks(s).widths = ceil(GABA_peaks(s).widths)* header.xstep;
+% plot mean SICI at electrode(s)of interest - baseline, per medication
+for m = 1:length(medication) 
+    % prepare data
+    data_visual = squeeze(GABA_SICI.mean(m, 1, :, :));
     
-    % plot figure
+    % launch the figure
     fig = figure(figure_counter);
     hold on
-    findpeaks(data_visual, x_narrow, 'Annotate', 'extents', 'WidthReference', 'halfheight');
-    set(gca, 'fontsize', 14)
-    xlabel('time(s)')
-    ylabel('power (\muV^2)')
-    grid off
-    
-    % add width denotation
-    for k = 1:length(GABA_peaks(s).widths)
-        if k == length(GABA_peaks(s).widths)
-            text(GABA_peaks(s).latencies(k) - 0.005, -0.25, sprintf('%1.0f ms', GABA_peaks(s).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
-        else
-            text(GABA_peaks(s).latencies(k) - 0.005, -0.25, sprintf('%1.0f', GABA_peaks(s).widths(k)*1000), 'Color', [0.93 0.69 0.13], 'FontSize', 14)
-        end
-    end
-    xlim([-0.005, 0.26])
-    
-    % save figure, update
-    savefig(['GABA_' target '_widths'])
-    saveas(fig, ['GABA_' target '_widths.png'])
-    figure_counter = figure_counter + 1;
-    end
-clear s i
 
-%%% ONLY FOR AG %%%
-GABA_peaks(s).widths = [GABA_peaks(s).widths(1:2), GABA_peaks(s).widths(2), GABA_peaks(s).widths(3:5)];
-%%%%%%%%%%%%%%%%%%%
+    % set limits of the figure
+    yl = [-5.3 5.3];
 
-% append new variables to the general MATLAB file
-save(filename, 'GABA_TEP', '-append');
-clear x_start_narrow x_end_narrow x_narrow s k data fig P L R 
+    % shade interpolated interval
+    plot(x, data_visual(1, :), 'b:', 'LineWidth', 0.5);
+    rectangle('Position', [-0.005, yl(1), 0.015, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
 
-%% 5) EOIs
-% ----- decide output parameters -----
-seed_electrode = {'target' 'Cz'};                           % electrode that will be used to set 0 timepoint
-seed_peaks = {1:4, 5:6};                                    % which peek s use which seed electrode
-buffer = 0.5;                                               % a margin of the window for peak visualisation 
-eoi_n = 3;                                                  % number of detected EOIs
-% ------------------------------------
+    % choose colour
+    col(1, :) = colours((m-1)*2 + 1, :); col(2, :) = colours((m-1)*2 + 2, :);
+    
+    % plot all channels
+    for e = 1:size(data_visual, 1)
+        plot(x, data_visual(e, :), 'Color', col(1, :))
+    end
+    
+    % plot electrode(s) of interest
+    for e = 1:length(electrode)
+        e_n = find(strcmp(labels, electrode{e}));
+        e_p(e) = plot(x, data_visual(e_n, :), 'Color', col(2, :), 'LineWidth', 2.5, 'LineStyle', linestyle{e})
+    end
 
-% check if numbers match
-if numel(seed_electrode) ~= numel(seed_peaks)
-    disp('Number of seed electrodes does not correspond to the seed peak distribution!')
-end
+    % mark TMS stimulus and zerol line
+    line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+    line(time_window, [0, 0], 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1.5)
 
-% k = 1; p = 1; m = 1; s = 1; e = 1;
-for k = 1:length(GABA_peaks(1).peaks)
-    % select seed 
-    for a = 1:numel(seed_electrode)
-        if any(seed_peaks{a} == k)
-            seed = find(contains(labels, seed_electrode{a}));
-        end
-    end
-    
-    % loop through the datasets
-    counter = 1;
-    for p = 1:length(participant)
-        for m = 1:length(medication)
-            for s = 1:length(stimulus)
-                % choose data from the seed electrode
-                for e = 1:size(GABA_data, 5)
-                    data(1, e, 1, 1, 1, :) = squeeze(GABA_data(m, 1, s, p, e, :));
-                end
-
-                % identify peak latency for current dataset
-                [peak_center, data_c, data_c_sub] = track_peak(data, header, time_window, k, GABA_peaks(s), buffer, seed);
-                
-                % fill in outcome structure
-                GABA_TEP_subject(p).latency(m, k) = peak_center;
-                
-                % append centered data
-                statement = ['GABA_' GABA_peaks(s).peaks{k} '_centered(counter, :, :) = data_c;'];
-                eval(statement)
-                
-                % append centered subtracted data
-                statement = ['GABA_' GABA_peaks(s).peaks{k} '_subtracted(counter, :, :) = data_c_sub;'];
-                eval(statement)
-                
-                % update row counter
-                counter = counter + 1;
-            end
-        end
-    end
-end
-clear counter a k p m t s e data statement peak_center data_c data_c_sub seed
-
-% average across subjects and sessions, save for letswave
-for k = 1:length(GABA_peaks(1).peaks)
-    % choose centered data
-    statement = ['data_i =  GABA_' GABA_peaks(1).peaks{k} '_centered;'];
-    eval(statement)
-    
-    % average across trials (subject x medication)
-    for e = 1:size(data_i, 2)
-        for i = 1:size(data_i, 3)
-            data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-            GABA_tracking(k).centered(e, i) = mean(squeeze(data_i(:, e, i)));        
-        end
-    end
-    
-    % save for LW
-    filename = ['TEP tracked ' target ' '  GABA_peaks(1).peaks{k} ' centered'];
-    header.name = filename; 
-    header.datasize(6) = size(data, 6);
-    span = (1 + buffer) * GABA_peaks(1).widths(k);
-    header.xstart = - span/2;
-    save([filename '.mat'], 'data');
-    save([filename '.lw6'], 'header');    
-    clear data
-    
-    % choose centered subtracted data
-    statement = ['data_i =  GABA_' GABA_peaks(1).peaks{k} '_subtracted;'];
-    eval(statement)
-    
-    % average across trials (subject x medication)
-    for e = 1:size(data_i, 2)
-        for i = 1:size(data_i, 3)
-            data(1, e, 1, 1, 1, i) =  mean(squeeze(data_i(:, e, i)));         
-            GABA_tracking(k).subtracted(e, i) = mean(squeeze(data_i(:, e, i)));        
-        end
-    end
-    
-    % save for LW
-    filename = ['TEP tracked ' target ' '  GABA_peaks(1).peaks{k} ' subtracted'];
-    header.name = filename; 
-    save([filename '.mat'], 'data');
-    save([filename '.lw6'], 'header');    
-    clear data    
-end
-clear k e i data_i statement filename span
-
-% choose EOIs based on centered datasets
-for k = 1:length(GABA_peaks(1).peaks)
-    % choose data, baseline correct
-    data =  GABA_tracking(k).centered;
-    
-    % choose peak polarity
-    if strcmp(GABA_peaks(1).peaks{k}(1), 'P')
-        operation = 'max';
-    elseif strcmp(GABA_peaks(1).peaks{k}(1), 'N')
-        operation = 'min';
-    end
-    
-    % loop through electrodes
-    for e = 1:size(data, 1)
-        % calculate maximal amplitude
-        statement = ['peak_value(e) = ' operation '(data(e, :));'];
-        eval(statement)
-    end
-    
-    % identify three electrodes with the biggest response
-    for e = 1:eoi_n
-        statement = ['eoi_value(e) = ' operation '(peak_value);'];
-        eval(statement)
-        GABA_tracking(k).eoi.number(e) = find(peak_value == eoi_value(e));
-        GABA_tracking(k).eoi.name{e} = labels(find(peak_value == eoi_value(e))); 
-        peak_value(find(peak_value == eoi_value(e))) = 0;
-    end
-    
-    % visualization parameters
-    x_lim = ((1 + buffer) * GABA_peaks(1).widths(k))/2;
-    x_eoi = -x_lim:xstep:x_lim;
-    col = [0.8, 0.11, 0.23; 0.9, 0.24, 0.24; 1, 0.45, 0.45];
-    
-    % plot 
-    fig = figure(figure_counter)
-    hold on
-    counter = 1;
-    for e = 1:size(data, 1)
-        if any(GABA_tracking(k).eoi.number == e)
-            P(counter) = plot(x_eoi, data(e, :), 'Color', col(counter, :), 'LineWidth', 2.5);
-            counter = counter + 1;
-        else
-            plot(x_eoi, data(e, :), 'Color', [0.65, 0.65, 0.65], 'LineWidth', 1.5)
-        end
-    end
-    
     % add other parameters
-    title(GABA_peaks(1).peaks{k})
-    xlabel('time (s)')
+    title(sprintf('baseline SICI: %s', medication{m}))
     ylabel('amplitude (\muV)')
     set(gca, 'FontSize', 14)
-    lgd = legend(P, {cell2mat(GABA_tracking(k).eoi.name{1}) cell2mat(GABA_tracking(k).eoi.name{2}) cell2mat(GABA_tracking(k).eoi.name{3})}, ...
-        'Location', 'northeast');
+    xlim(time_window)
+    ylim(yl)
+
+    % add legend
+    lgd = legend(e_p, electrode, 'Location', 'southeast');
     lgd.FontSize = 14;
     hold off
-    
+ 
+    % change figure size
+    fig.Position = [250 250 600 350];
+
     % name and save figure
-    figure_name = ['TEP_' target '_eoi'];
-    savefig([figure_name])
-    saveas(fig, [figure_name '.png'])
-        
+    figure_name = ['TEP_' target '_SICI_bl_'  medication{m}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
     % update figure counter
     figure_counter = figure_counter + 1 ;
 end
-clear k e operation statement fig x_lim x col figure_name lgd P 
+clear m data_visual fig yl col e e_n e_p lgd figure_name linestyle
+
+% plot mean SICI at electrode(s)of interest - per medication
+for e = 1:length(electrode) 
+    % identify the electrode
+    e_n = find(strcmp(labels, electrode{e}));
+    
+    % loop through conditions
+    for m = 1:length(medication)            
+        % launch the figure
+        fig = figure(figure_counter);
+            
+        % ----- plot TS and ppTMS separately -----
+        for t = 1:length(time)                        
+            subplot(3, 1, t) 
+            hold on
+            
+            % prepare data
+            data_visual = squeeze(GABA_data_mean(m, t, [2 3], e_n, :));
+            CI_visual = squeeze(GABA_data_CI(m, t, [2 3], e_n, :));
+            
+            % set limits of the figure
+            plot(x, data_visual(1, :) + CI_visual(1, :), 'b:', 'LineWidth', 0.5)
+            plot(x, data_visual(1, :) - CI_visual(1, :), 'b:', 'LineWidth', 0.5)
+            yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
+            cla, hold on
+
+            % shade interpolated interval 
+            plot(x, data_visual(1, :), 'b:', 'LineWidth', 0.5);
+            rectangle('Position', [-0.005, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+            
+            % choose colour
+            col(1, :) = colours((m-1)*2 + t, :); col(2, :) = colours(6, :);
+
+            % loop through datasets to plot
+            for s = 1:size(data_visual, 1)        
+                P(s) = plot(x, data_visual(s, :), 'Color', col(s, :), 'LineWidth', 2.5);
+                F(s) = fill([x fliplr(x)],[data_visual(s, :) + CI_visual(s, :) fliplr(data_visual(s, :) - CI_visual(s, :))], ...
+                    col(s, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+            end
+            
+            % mark TMS stimulus
+            line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+
+            % add other parameters
+            title([time{t} ' medication'])
+            ylabel('amplitude (\muV)')
+            set(gca, 'FontSize', 14)
+            xlim(time_window)
+            ylim(yl)
+            
+            % add legend
+            lgd = legend(P, stimulus([2 3]), 'Location', 'southeast');
+            lgd.FontSize = 14;
+            hold off
+            
+            clear P F col
+        end
+            
+    % ----- plot SICI -----
+        subplot(3, 1, 3) 
+        hold on
+        
+        data_visual = squeeze(GABA_SICI.mean(m, :, e_n, :));
+        CI_visual = squeeze(GABA_SICI.CI(m, :, e_n, :));
+
+        % set limits of the figure
+        plot(x, data_visual(1, :) + CI_visual(1, :), 'b:', 'LineWidth', 0.5)
+        plot(x, data_visual(1, :) - CI_visual(1, :), 'b:', 'LineWidth', 0.5)
+        yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
+        cla, hold on
+
+        % shade interpolated interval, add zero line
+        plot(x, data_visual(1, :), 'b:', 'LineWidth', 0.5);
+        rectangle('Position', [-0.005, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+        line(time_window, [0, 0], 'LineStyle', ':', 'Color', [0.75, 0.75, 0.75], 'LineWidth', 1.5)
+
+        % choose colour
+        col(1, :) = colours((m-1)*2 + 1, :); col(2, :) = colours((m-1)*2 + 2, :);
+
+        % loop through datasets to plot
+        for s = 1:size(data_visual, 1)        
+            P(s) = plot(x, data_visual(s, :), 'Color', col(s, :), 'LineWidth', 2.5);
+            F(s) = fill([x fliplr(x)],[data_visual(s, :) + CI_visual(s, :) fliplr(data_visual(s, :) - CI_visual(s, :))], ...
+                col(s, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+        end
+
+        % mark TMS stimulus
+        line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+
+        % add other parameters
+        title('SICI')
+        xlabel('time (s)')
+        ylabel('amplitude (\muV)')
+        set(gca, 'FontSize', 14)
+        xlim(time_window)
+        ylim(yl)
+
+        % add legend
+        lgd = legend(P, time, 'Location', 'southeast');
+        lgd.FontSize = 14;
+        hold off
+
+        clear P F col
+            
+    % ----- finalize -----
+        % add global title
+        suptitle(sprintf('SICI: %s, %s electrode', medication{m}, electrode{e}))
+        
+        % change figure size
+        fig.Position = [250 250 500 700];
+
+        % name and save figure
+        figure_name = ['TEP_' target '_SICI_'  medication{m} '_' electrode{e}];
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
+
+        % update figure counter
+        figure_counter = figure_counter + 1 ;
+        end
+end
+clear e m t s e_n fig sp data_visual CI_visual yl lgd figure_name
+
+% calculate GFP of SICI
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for p = 1:length(participant)
+            % calculate GFP (exclude target channel)
+            GABA_SICI.GFP(m, t, p, :) = std(squeeze(GABA_SICI.individual(m, t, p, 1:30, :)), 1);  
+        end
+    end
+end
+clear m t p
+
+% calculate mean SICI GFP
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for i = 1:size(GABA_data, 6)
+            GABA_SICI.GFP_mean(m, t, i) = mean(squeeze(GABA_SICI.GFP(m, t, :, i)));
+            GABA_SICI.GFP_CI(m, t, i) = (std(squeeze(GABA_SICI.GFP(m, t, :, i)))/sqrt(length(participant))) * z;
+        end
+    end 
+end
+clear m t i 
+
+% plot mean SICI GFP - separate graph per medication
+for m = 1:length(medication)  
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
+
+    %  choose data
+    data_visual = squeeze(GABA_SICI.GFP_mean(m, :, :));
+    CI_visual = squeeze(GABA_SICI.GFP_CI(m, :, :));
+    
+    % set limits of the figure
+    yl = [0 5]; ylim(yl)
+    xlim(time_window)
+
+    % shade interpolated interval, add zero line
+    plot(x, data_visual(1, :), 'b:', 'LineWidth', 0.5);
+    rectangle('Position', [-0.005, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+    line(time_window, [0, 0], 'LineStyle', ':', 'Color', [0.75, 0.75, 0.75], 'LineWidth', 1.5)
+
+    % choose colour
+    col(1, :) = colours((m-1)*2 + 1, :); col(2, :) = colours((m-1)*2 + 2, :);
+
+    % loop through datasets to plot
+    for t = 1:length(time)       
+        P(t) = plot(x, data_visual(t, :), 'Color', col(t, :), 'LineWidth', 2.5);
+        F(t) = fill([x fliplr(x)],[data_visual(t, :) + CI_visual(t, :) fliplr(data_visual(t, :) - CI_visual(t, :))], ...
+            col(t, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+    end
+
+    % mark TMS stimulus
+    line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+    
+
+
+    % add other parameters
+    title(sprintf('SICI - GFP: %s', medication{m}))
+    xlabel('time (s)')
+    ylabel('amplitude (\muV)')
+    set(gca, 'FontSize', 14)
+
+    % add legend
+    lgd = legend(P, {'baseline' 'post medication'}, 'Location', 'southeast');
+    lgd.FontSize = 14;
+    hold off
+    
+    % change figure size
+    fig.Position = [250 250 600 350];
+
+    % name and save figure
+    figure_name = ['TEP_' target '_SICI_GFP_'  medication{m}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
+    % update figure counter
+    figure_counter = figure_counter + 1 ;
+end
+clear e m t s e_n fig sp data_visual CI_visual yl lgd figure_name P F col
+
+% save SICI datasets for letswave
+for m = 1:length(medication)
+    for t = 1:length(time)
+        % create data
+        for p = 1:length(participant)
+            data(p, :, 1, 1, 1, :) = squeeze(GABA_SICI.individual(m, t, p, :, :));
+        end
+        
+        % create header
+        header.name = ['merged SICI ' medication{m} ' ' time{t}];
+        header.datasize = size(data);
+        header.xstart = time_window(1);
+        
+        % save
+        save([folder_export '\' header.name '.mat'], 'data')
+        save([folder_export '\' header.name '.lw6'], 'header')
+    end
+end
+clear m t p 
+
+% append new variable to the general MATLAB file
+save(output_file, 'GABA_SICI', '-append');
+
+%% 8) GFP amplitude extraction
+% ----- decide output parameters -----
+GABA_TEP_default.peak = {'N17' 'P30' 'N45' 'P60' 'N100' 'P180'};            % peaks of interest
+GABA_TEP_default.center = [0.017 0.03 0.045 0.06 0.10 0.2];               % default starting latencies
+GABA_TEP_default.span = [0.015 0.02 0.015 0.02 0.06 0.06];                  % default peak span
+percent = 20;                                                               % % of timepoints included in the mean amplitude calculation
+map_lims = [-2.5 2.5; -4 4; -4 4];
+% ------------------------------------
+% loop through subjects and conditions
+for p = 3:length(participant)
+    for m = 1:length(medication) 
+        for t = 1:length(time)
+            for s = 1:length(stimulus)
+                % setup names   
+                figure_title = sprintf('Subject n. %d: %s, %s medication, %s', ...
+                    participant(p), medication{m}, time{t}, stimulus{s});                                       
+
+                % choose data 
+                data_visual = double(squeeze(GABA_GFP(m, t, s, p, :))); 
+                for e = 1:30
+                    data_topoplot(1, e, 1, 1, 1, :) = squeeze(GABA_data(m, t, s, p, e, :));
+                end
+
+                % launch summary figure 
+                if figure_counter < 3
+                    figure_counter = 3;
+                end
+                fig = figure(figure_counter); 
+                hold on
+
+                % initiate the main plot  
+                subplot(4, 6, 1:18)
+                plot(x, data_visual, ':b')
+                yl = get(gca, 'ylim'); 
+                xlim(time_window);
+                rectangle('Position', [-0.005, yl(1)+0.01, 0.015, yl(2) - yl(1) - 0.02], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')                
+                line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+
+                % cover for ppTMS
+                if t == 1 & s ~= 3
+                    % loop through peaks
+                    for k = 1:length(GABA_TEP_default.peak)                 
+                        % define default TOI 
+                        center = GABA_TEP_default.center(k);
+                        span = GABA_TEP_default.span(k);
+
+                        % set manually the final TOI
+                        finish = 0;
+                        while finish == 0;
+                            % launch the figure
+                            fig_1 = figure(1); 
+                            hold on                      
+
+                            % plot the background 
+                            subplot(4, 6, [7:24]);
+                            hold on
+                            plot(x, data_visual, 'b:', 'LineWidth', 0.5)
+                            yl = ylim; yl = [yl(1) - 0.2, yl(2) + 0.2]; ylim(yl)
+                            xlim(time_window)
+                            rectangle('Position', [-0.005, yl(1), 0.015, yl(2)-yl(1)], 'FaceColor', [0.9020    0.9020    0.9020], 'EdgeColor', 'none')
+                            title(sprintf('%s\n%s', figure_title, GABA_TEP_default.peak{k}), 'FontSize', 16)
+                            set(gcf,'units','normalized','outerposition',[0 0 1 1])
+
+                            % visualize default peak TOI
+                            subplot(4, 6, [7:24])
+                            hold on
+                            rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
+
+                            % calculate mean amplitude
+                            [amplitude, averaged_x, averaged_data] = GFP_amplitude(data_visual', center, span, percent, xstep, time_window(1)); 
+
+                            % calculate  real peak latency (round up)
+                            central_latency = averaged_x(ceil(length(averaged_x)/2));
+
+                            % update the figure
+                            subplot(4, 6, [7:24])
+                            for a = 1:length(averaged_x)
+                                line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+                                hold on
+                            end
+
+                            % add the topoplot    
+                            subplot(4, 6, 1);
+                            topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims(s, :)) 
+
+                            % replot the data to make it visible
+                            subplot(4, 6, [7:24])
+                            hold on
+                            plot(x, data_visual, 'b', 'LineWidth', 2.5)
+                            line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+                            line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)
+
+                            % ask for approval
+                            answer = questdlg('Do you want to proceed?', GABA_TEP_default.peak{k},...
+                                'Yes, extract outcome values.', 'No, I will adjust TOI manually.', 'Yes, extract outcome values.');
+
+                            % switch action
+                            switch answer
+                                case 'Yes, extract outcome values.'
+                                    % close the figure
+                                    close(fig_1)
+
+                                    % exit the while loop
+                                    finish = 1;
+
+                                case 'No, I will adjust TOI manually.'
+                                    % assign previous center and span
+                                    choose_center = center;  
+                                    choose_span = 2 * span;  
+
+                                    % identify the limits for visualisation of current peak
+                                    choose_x1 = ceil((choose_center - choose_span/2 - time_window(1)) / xstep);
+                                    choose_x2 = ceil((choose_center + choose_span/2 - time_window(1)) / xstep);
+                                    choose_x = (choose_center - choose_span/2) : xstep : (choose_center + choose_span/2);
+
+                                    % prepare data and header for visualization
+                                    choose_data = double(squeeze(GABA_GFP(m, t, s, p, choose_x1 : choose_x2)));
+                                    choose_header = header;
+                                    choose_header.datasize(6) = length(choose_data);  
+                                    choose_header.xstart = choose_center - choose_span/2;
+
+                                    % check if vector size matches
+                                    if length(choose_data) ~= length(choose_x)
+                                        diff = length(choose_data) - length(choose_x);
+                                        if diff > 0
+                                            choose_data = choose_data(1:end - diff);
+                                        elseif diff < 0
+                                            choose_x = choose_x(1:end + diff);
+                                        end
+                                    end
+
+                                    % launch the choosing figure                 
+                                    choose_figure_name = ['Choose manually peak ' GABA_TEP_default.peak{k}];
+                                    choose_axesHandles = [];
+                                    choose_fig = figure(2);   
+                                    choose_axesHandles = [choose_axesHandles subplot(3, 3, [4:9])];  
+                                    plot(choose_x, choose_data, 'LineWidth', 2)
+                                    xlim([(choose_center - choose_span/2), (choose_center + choose_span/2)])
+                                    title(choose_figure_name, 'FontSize', 16)
+                                    hold on                
+
+                                    % plot the line at the center
+                                    l = line([choose_center, choose_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--'); 
+                                    hold on    
+
+                                    % plot the central topography 
+                                    choose_axesHandles = [choose_axesHandles subplot(3, 3, 2)];
+                                    topo_plot(header, data_topoplot, choose_center, time_window(1), map_lims(s, :));
+                                    hold on            
+
+                                    % choose the peak position
+                                    pos_x = get_position(choose_axesHandles);  
+
+                                    % update the figure
+                                    set (choose_fig, 'WindowButtonMotionFcn', '');
+                                    subplot(3, 3, [4:9])
+                                    set(l, 'XData', [pos_x, pos_x], 'LineStyle', '-');
+                                    subplot(3, 3, 2) 
+                                    cla(choose_axesHandles(2))
+                                    topo_plot(header, data_topoplot, pos_x, time_window(1), map_lims(s, :));
+                                    hold off
+
+                                    % update the central latency
+                                    center = pos_x;
+
+                                    % close the choosing figure
+                                    pause(2)
+                                    close(choose_fig)
+
+                                    % close the the main figure
+                                    close(fig_1)
+                            end
+                        end
+                        clear fig_1 choose_header choose_map_lims choose_span choose_x choose_x1 choose_x2 l
+
+                        % record outcome variables
+                        GABA_GFP_peaks.latency(m, t, s, p, k) = central_latency;  
+                        GABA_GFP_peaks.amplitude(m, t, s, p, k) = amplitude; 
+
+                        % update the main figure
+                        figure(fig)
+                        subplot(4, 6, 1:18)
+                        hold on
+
+                        %plot the shading
+                        for a = 1:length(averaged_x)
+                            line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+                            hold on
+                        end
+
+                        % add topoplot
+                        subplot(4, 6, 18+k)
+                        topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims(s, :));  
+
+                        % shift down
+                        pos = get(gca, 'Position');
+                        pos(2) = pos(2) - 0.05;
+                        set(gca, 'Position', pos);
+
+                        % add timing
+                        text(-0.3, -0.8, sprintf('%s', GABA_TEP_default.peak{k}), 'Color', [1 0 0], 'FontSize', 14)
+                    end                                       
+                else
+                    % loop through peaks
+                    for k = 1:length(GABA_TEP_default.peak)                 
+                        % define default TOI 
+                        if t == 2
+                            center = GABA_GFP_peaks.latency(m, 1, s, p, k);
+                        elseif s == 3
+                           center = GABA_GFP_peaks.latency(m, t, 2, p, k); 
+                        end
+                        span = GABA_TEP_default.span(k);
+                        
+                        % calculate mean amplitude
+                        [amplitude, averaged_x, averaged_data] = GFP_amplitude(data_visual', center, span, percent, xstep, time_window(1)); 
+
+                        % calculate  real peak latency (round up)
+                        central_latency = averaged_x(ceil(length(averaged_x)/2));
+                        
+                        % record outcome variables
+                        GABA_GFP_peaks.latency(m, t, s, p, k) = central_latency;  
+                        GABA_GFP_peaks.amplitude(m, t, s, p, k) = amplitude; 
+
+                        % update the main figure
+                        figure(fig)
+                        subplot(4, 6, 1:18)
+                        hold on
+
+                        %plot the shading
+                        for a = 1:length(averaged_x)
+                            line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+                            hold on
+                        end
+
+                        % add topoplot
+                        subplot(4, 6, 18+k)
+                        topo_plot(header, data_topoplot, central_latency, time_window(1), map_lims(s, :));  
+
+                        % shift down
+                        pos = get(gca, 'Position');
+                        pos(2) = pos(2) - 0.05;
+                        set(gca, 'Position', pos);
+
+                        % add timing
+                        text(-0.3, -0.8, sprintf('%s', GABA_TEP_default.peak{k}), 'Color', [1 0 0], 'FontSize', 14)
+                    end    
+                end
+                
+                % finalize the summary figure
+                figure(fig)
+                sgtitle(figure_title)
+
+                % replot the data to make it visible
+                subplot(4, 6, 1:18)
+                hold on
+                plot(x, data_visual, 'color', [0 0 0], 'LineWidth', 2)
+                line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)                
+
+                % add other parameters
+                set(gca, 'Fontsize', 14)
+                ylabel('GFP (\muV)')
+                xlabel('time (s)')                
+                hold off
+
+                % change figure size
+                fig.Position = [250 250 650 550];
+
+                % name and save figure
+                if participant(p) < 10
+                    subj = ['0' num2str(participant(p))];
+                else
+                    subj = num2str(participant(p));
+                end
+                figure_name = ['GFP_' target '_peaks_' subj '_' medication{m} '_' time{t} '_' stimulus{s}];
+                savefig([folder_figures '\GFP amplitude\' figure_name '.fig'])
+                saveas(fig, [folder_figures '\GFP amplitude\' figure_name '.png'])
+                close(fig)
+
+                % update the figure counter
+                figure_counter = figure_counter + 1;  
+            end
+        end
+    end    
+    % play a celebratory sound at the end of each participant
+    tune = load('handel.mat');
+    sound(tune.y, tune.Fs)
+    
+    % append progressively the output variables to the general MATLAB file
+    save(output_file, 'GABA_GFP_peaks', '-append');
+end
+clear p m t s figure_title data_visual e data_topoplot center span fig yl amplitude averaged_x averaged_data central_latency...
+    finish answer choose_fig choose_axesHandles choose_center choose_data choose_figure_name pos_x tune   
+
+% save data in a R-compatible table 
+if ~exist('GABA_GFP_peak_table')
+    GABA_GFP_peak_table = table;
+end
+row_counter = height(GABA_GFP_peak_table) + 1;
+for p = 1:length(participant) 
+    for m = 1:length(medication)  
+        for t = 1:length(time)
+            for s = 1:length(stimulus)
+                for k = 1:length(GABA_TEP_default.peak) 
+                    %fill in the table
+                    GABA_GFP_peak_table.subject(row_counter) = participant(p);
+                    GABA_GFP_peak_table.medication(row_counter) = medication(m);
+                    GABA_GFP_peak_table.time(row_counter) = time(t);
+                    GABA_GFP_peak_table.stimulus(row_counter) = stimulus(s);
+                    GABA_GFP_peak_table.peak(row_counter) = GABA_TEP_default.peak(k);
+                    GABA_GFP_peak_table.amplitude(row_counter) = GABA_GFP_peaks.amplitude(m, t, s, p, k);
+                    GABA_GFP_peak_table.latency(row_counter) = GABA_GFP_peaks.latency(m, t, s, p, k);
+                    
+                    % update the counter
+                    row_counter = row_counter + 1;
+                end
+            end
+        end
+    end
+end
+clear m tm s p k row_counter
+writetable(GABA_GFP_peak_table, 'GABA_GFP_peak_table.csv')
 
 % append new variables to the general MATLAB file
-save(filename, 'GABA_tracking', '-append');
-clear seed_electrode seed_peaks buffer eoi_n
-                    
-%% 5) peak windows
-%% 6) amplitude extraction
+save(output_file, 'GABA_TEP_default', 'GABA_GFP_peaks', '-append');
+
+%% GFP amplitude - fixed latency
+
+
 %% functions
-function peak_x = gmfp_plot(x, y, time_window, xstep, labeled, varargin)
+function peak_x = gfp_plot(x, y, time_window, xstep, labeled, varargin)
 % check whether to plot labels (default)
 if ~isempty(varargin)
     a = find(strcmpi(varargin, 'max_peaks'));
@@ -982,7 +1296,7 @@ plot(x, y, 'Color', [0 0 0], 'LineWidth', 2.5)
 line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
 
 % find peaks 
-[pks, locs] = findpeaks(y, 'MinPeakDistance', 10, 'MinPeakProminence', 0.015);
+[pks, locs] = findpeaks(y, 'MinPeakDistance', 5, 'MinPeakProminence', 0.01);
 for a = 1:length(locs)
     if time_window(1) + locs(a)*xstep <= 0.015
         idx(a) = false;
@@ -1023,75 +1337,6 @@ ylim(yl)
 xlabel('time (s)')
 ylabel('potential (\muV)')
 end
-
-function [peak_x, peak_y] = gmfp_peaks(y, time_window, xstep, varargin)
-% check whether to plot labels (default)
-if ~isempty(varargin)
-    a = find(strcmpi(varargin, 'max_peaks'));
-    if ~isempty(a)
-        max_peaks = varargin{a + 1};
-    end
-end
-
-% find peaks 
-[pks, locs] = findpeaks(y, 'MinPeakDistance', 10, 'MinPeakProminence', 0.015);
-for a = 1:length(locs)
-    if time_window(1) + locs(a)*xstep <= 0.015
-        idx(a) = false;
-    elseif time_window(1) + locs(a)*xstep > 0.220
-        idx(a) = false;        
-    else
-        idx(a) = true;
-    end
-end
-pks = pks(idx); locs = locs(idx);
-if length(pks) > max_peaks
-    pks = pks(1:max_peaks); 
-    locs = locs(1:max_peaks);
-end
-
-% calculate peak coordinations
-for a = 1:length(locs)
-    peak_x(a) = time_window(1) + locs(a)*xstep;
-    peak_y(a) = pks(a);
-end
-peak_y = double(peak_y);
-end
-
-function [p1, p2, f] = gmfp_plot_diff(x, y, time_window, colours)
-% calculate the time difference
-for g = 1:size(y, 2)
-    y(3, g) = y(2, g) - y(1, g);
-end
-
-% launch the figure 
-hold on
-plot(x, y(1, :))
-plot(x, y(3, :))
-yl = get(gca, 'ylim'); yl = [yl(1) - 0.1 , yl(2) + 1];
-clf
-
-% plot interpolated part
-hold on
-xlim(time_window)
-rectangle('Position', [0, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
-
-% plot data
-p1 = plot(x, y(1, :), 'Color', [0 0 0], 'LineWidth', 2.5);
-p2 = plot(x, y(2, :), 'Color', colours(2, :) , 'LineWidth', 2.5);
-f = fill([x fliplr(x)],[y(3, :) fliplr(zeros(1, length(x)))], colours(1, :), 'linestyle', 'none');
-    
-% add lines    
-line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
-line(time_window, [0, 0], 'Color', [0, 0, 0], 'LineWidth', 1.5)
-
-% add parameters
-set(gca, 'fontsize', 14)
-ylim(yl)
-xlabel('time (s)')
-ylabel('power (\muV^2)')
-end
-
 function topo_plot(header, data, x_pos, x_start, map_lims)
 varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
 
@@ -1113,135 +1358,72 @@ end;
 topoplot(vector2,chanlocs2,varargin{:});
 set(gcf,'color',[1 1 1]);
 end
+function plot_DISS(x, data_visual, fig_title, colours, time_window)
+hold on
+title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
+set(gca, 'fontsize', 12); xlabel('time (s)')
+ax = gca; ax.XColor = [0.5 0.5 0.5];
+plot(x, data_visual(1, :), 'Color', colours(1, :), 'LineWidth', 2.5)
+fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+    colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
+line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
+line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
+line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+ylim([-0.75 1.75]); 
+lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
+lgd.FontSize = 12;
+end
+function [amplitude, averaged_x, averaged_data] = GFP_amplitude(data, center, span, percent, step, xstart)
+% ------------------------------------------------------------------------
+% Fnc: Calculates mean amplitude of the most prominent <percent> of the TOI 
+%       --> TOI defined by the center value and the span of the time window
+% 
+% Input: 
+%   data - vector of values (double), GFP 
+%   center, span - num values that define the TOI
+%   percent - how many top percent of datapoints will be included in the average
+%   step, xstart - defines properties of time axes 
+% 
+% Author: Dominika (2020) 
+% ------------------------------------------------------------------------
 
-function [pos_x, data, sub_data] = track_peak(data, header, time_window, k, TEPs, buffer, seed)
-% figure params 
-figure_name = ['Peak ' TEPs.peaks{k}] ;
-figure_center = TEPs.latencies(k);
-span = ((1 + buffer) * TEPs.widths(k));
+% prepare the interval vector 
+interval = false(1, length(data));
 
-% set the peak timepoint manually
-finish = 0;
-while finish == 0
-    % identify the TOI of current peak                    
-    x1 = ceil((figure_center - span/2 - time_window(1)) / header.xstep);
-    x2 = ceil((figure_center + span/2 - time_window(1)) / header.xstep);
-    x = (figure_center - span/2) : header.xstep : (figure_center + span/2);
+% define the boundaries of the TOI - both limits are included in the interval!
+start = round(((center-span/2) - xstart)/step);
+stop = round(((center+span/2) - xstart)/step);
+data_crop = data(start : stop);
 
-    % prepare data and header for visualization
-    data_visual = data(1, :, :, :, :, [x1 : x2]);
-    header_visual = header;
-    header_visual.datasize(6) = length(data_visual);  
-    header_visual.xstart = figure_center - span/2;
+% calculate number of points to average
+points_number = ceil((percent/100) * length(data_crop));
 
-    % launch the figure                    
-    axesHandles = [];
-    fig = figure;   
-    hold on          
-    
-    % check the length
-    if length(squeeze(data_visual(1, seed, :, :, :, :))) > numel(x)
-        delta = length(squeeze(data_visual(1, seed, :, :, :, :))) -  numel(x);
-        data_visual = data_visual(1, :, :, :, :, 1:end-delta);
-    elseif length(squeeze(data_visual(1, seed, :, :, :, :))) < numel(x)
-        delta = numel(x) - length(squeeze(data_visual(1, seed, :, :, :, :)));
-        data_visual(1, :, :, :, :, end + 1:end + delta) = zeros(1, delta);
-    end
-    
-    % plot windowed data
-    axesHandles = [axesHandles subplot(3, 3, [4:9])];  
-    plot(x, squeeze(data_visual(1, seed, :, :, :, :)), 'LineWidth', 2)
-    xlim([(figure_center - span/2), (figure_center + span/2)])
-    title(figure_name, 'FontSize', 16)
+% sort the data 
+data_sorted = sort(data_crop, 'descend');        
 
-    % plot the line at the center
-    h = line([figure_center, figure_center], get(gca,'ylim'), 'Color', 'red', 'LineWidth', 2, 'LineStyle', '--');   
+% calculate the mean value
+points_included = data_sorted(1:points_number);
+amplitude = mean(points_included);
 
-    % plot the central topography 
-    map_lims = get(axesHandles(1), 'ylim');
-    axesHandles = [axesHandles subplot(3, 3, 2)];
-    TEP_topoplot(header_visual, data_visual, figure_center, map_lims);
+% index averaged points
+for i = 1:points_number
+    point_pos = find(data_crop == points_included(i)); 
+    % in case there are two same values, take the earlier one
+    index(i) = point_pos(1);
+end
+index = sort(index);
 
-    % make the topography change with mouse movement 
-    set(fig, 'WindowButtonMotionFcn', {@mouse_move, axesHandles, header_visual, data_visual});              
-
-    % choose the peak position
-    pos_x = get_position(axesHandles);             
-
-    % update the figure
-    set (fig, 'WindowButtonMotionFcn', '');
-    subplot(3, 3, [4:9])
-    set(h, 'XData', [pos_x, pos_x], 'YData', get(gca,'ylim'), 'LineStyle', '-');
-    subplot(3, 3, 2) 
-    cla(axesHandles(2))
-    TEP_topoplot(header_visual, data_visual, pos_x, map_lims);
-
-    pause(2)
-
-    % ask for approval
-    answer = questdlg('Do you want to proceed?', figure_name,...
-        'Yes', 'No, I want to keep fiddling', 'Yes');
-
-    % switch action
-    switch answer
-        case 'Yes'
-            % close the figure
-            close(fig)
-
-            % exit the while loop
-            finish = 1;
-
-        case 'No, I want to keep fiddling'
-            % assign previous center
-            figure_center = pos_x;  
-
-            % close the figure
-            close(fig)                                
-    end
-end   
-
-% index the peak timepoint  
-n_peak = ceil((pos_x - time_window(1)) / header.xstep); 
-
-% define final length
-window_length = numel((pos_x - span/2) : header.xstep : (pos_x + span/2));
-
-% loop through the data and subtract the value at the peak latency from all
-% timepoints
-sub_data = data;
-topo_vector = squeeze(data(1, :, 1, 1, 1, n_peak));                                             
-for i = 1:header.datasize(2)    % all channels
-    for n = 1:length(data)      % all datapoints 
-        sub_data(1, i, :, :, :, n) = data(1, i, :, :, :, n) - topo_vector(i);
-    end
+% fill ones in the interval vector at indexed positions
+for i = 1:points_number
+    interval(start + index(i) - 1) = true;
 end
 
-% crop the data
-x_out1 = ceil((pos_x - span/2 - time_window(1)) / header.xstep);
-x_out2 = ceil((pos_x + span/2 - time_window(1)) / header.xstep);
-sub_data = squeeze(sub_data(1, :, :, :, :, [x_out1 : x_out2]));
-data = squeeze(data(1, :, :, :, :, [x_out1 : x_out2]));
+% calculate the outcome vectors for visualisation
+averaged_data = data .* interval;                                  % keep only values ov averaged datapoints, the rest is set to 0
+averaged_index = find(averaged_data);                               % index the averaged datapoints
+averaged_x = averaged_index * step + xstart;                        % set the time interval
+averaged_data = averaged_data(find(averaged_data));                 % get rid of the zeros
 
-function TEP_topoplot(header, data, x_pos, map_lims)
-varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
-
-% fetch data to display
-x_visual = ceil((x_pos - header.xstart)/header.xstep);
-vector = squeeze(data(1,:,1,1,1,x_visual));
-
-%fetch chanlocs
-chanlocs = header.chanlocs;
-
-%parse data and chanlocs 
-i = 1;
-for chanpos=1:size(chanlocs,2);
-    vector2(i)=double(vector(chanpos));
-    chanlocs2(i)=chanlocs(chanpos);
-    i = i + 1;
-end;
-
-topoplot(vector2,chanlocs2,varargin{:});
-set(gcf,'color',[1 1 1]);
 end
 function mouse_move(hObject,eventdata, axesHandles, header_visual, data_visual)
 
@@ -1281,20 +1463,24 @@ CP = get(axesHandles(1), 'CurrentPoint');
 pos_x = CP(1,1);
 
 end
-end
+function TEP_topoplot(header, data, x_pos, map_lims)
+varargin = {'maplimits' map_lims 'shading' 'interp' 'whitebk' 'on'};
 
-function plot_DISS(x, data_visual, fig_title, colours, time_window)
-hold on
-title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
-set(gca, 'fontsize', 12); xlabel('time (s)')
-ax = gca; ax.XColor = [0.5 0.5 0.5];
-plot(x, data_visual(1, :), 'Color', colours(1, :), 'LineWidth', 2.5)
-fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
-    colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
-line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
-line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
-line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
-ylim([-0.75 1.75]); 
-lgd = legend({'DISS index' 'spatial correlation'}, 'Location', 'southeast');
-lgd.FontSize = 12;
+% fetch data to display
+x_visual = ceil((x_pos - header.xstart)/header.xstep);
+vector = squeeze(data(1,:,1,1,1,x_visual));
+
+%fetch chanlocs
+chanlocs = header.chanlocs;
+
+%parse data and chanlocs 
+i = 1;
+for chanpos=1:size(chanlocs,2);
+    vector2(i)=double(vector(chanpos));
+    chanlocs2(i)=chanlocs(chanpos);
+    i = i + 1;
+end;
+
+topo_plot(vector2,chanlocs2,varargin{:});
+set(gcf,'color',[1 1 1]);
 end
