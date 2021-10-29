@@ -1,7 +1,7 @@
 %% GABA-AD: TMS-EVOKED POTENTIALS - PRIMARY MOTOR CORTEX
 % Written by Dominika for GABA-AD project (2020-21)
 % 
-% % Colection of scripts to analyse preprocessed TMS-EEG data: 
+% Colection of scripts to extract outcome variables from preprocessed TMS-EEG data: 
 %   --> extraxted measures are saved in the global output MATLAB file 'GABA_YC_M1_TEPs'
 %   --> figures are saved in a folder 'GABA_YC_figures'
 %   --> exported datasets (for letswave or Ragu) are saved in a folder 'GABA_YC_export'
@@ -1832,7 +1832,7 @@ clear m t p
 save(output_file, 'GABA_SICI', '-append');
 
 %% 13) SICI: TEP peak amplitude change
-% calculate individual change for peak amplitude of each TEP peak --> nly at the baseline  
+% calculate individual change for peak amplitude of each TEP peak --> only at the baseline  
 for p = 1:length(participant)
     for m = 1:length(medication)
         for k = 1:6

@@ -1,3 +1,62 @@
+
+% plot mean SICI GFP - separate graph per medication
+for m = 1:length(medication)  
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
+
+    %  choose data
+    data_visual = squeeze(GABA_SICI.GFP_mean(m, :, :));
+    CI_visual = squeeze(GABA_SICI.GFP_CI(m, :, :));
+    
+    % set limits of the figure
+    yl = [0 5]; ylim(yl)
+    xlim(time_window)
+
+    % shade interpolated interval, add zero line
+    plot(x, data_visual(1, :), 'b:', 'LineWidth', 0.5);
+    rectangle('Position', [-0.005, yl(1), 0.01, yl(2) - yl(1)], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')
+    line(time_window, [0, 0], 'LineStyle', ':', 'Color', [0.75, 0.75, 0.75], 'LineWidth', 1.5)
+
+    % choose colour
+    col(1, :) = colours((m-1)*2 + 1, :); col(2, :) = colours((m-1)*2 + 2, :);
+
+    % loop through datasets to plot
+    for t = 1:length(time)       
+        P(t) = plot(x, data_visual(t, :), 'Color', col(t, :), 'LineWidth', 2.5);
+        F(t) = fill([x fliplr(x)],[data_visual(t, :) + CI_visual(t, :) fliplr(data_visual(t, :) - CI_visual(t, :))], ...
+            col(t, :), 'FaceAlpha', alpha, 'linestyle', 'none');
+    end
+
+    % mark TMS stimulus
+    line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+    
+
+
+    % add other parameters
+    title(sprintf('SICI - GFP: %s', medication{m}))
+    xlabel('time (s)')
+    ylabel('amplitude (\muV)')
+    set(gca, 'FontSize', 14)
+
+    % add legend
+    lgd = legend(P, {'baseline' 'post medication'}, 'Location', 'southeast');
+    lgd.FontSize = 14;
+    hold off
+    
+    % change figure size
+    fig.Position = [250 250 600 350];
+
+    % name and save figure
+    figure_name = ['TEP_' target '_SICI_GFP_'  medication{m}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
+    % update figure counter
+    figure_counter = figure_counter + 1 ;
+end
+clear e m t s e_n fig sp data_visual CI_visual yl lgd figure_name P F col
+
 %% DISS
 % m = 1; t = 1; s = 1, p = 1; i = 1;
 % normalize data by GMFP
@@ -421,3 +480,242 @@ pos_x = CP(1,1);
 
 end
 end
+%%
+%% 9) GFP amplitude - fixed latency
+for p = 2:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            for s = 1:length(stimulus)
+                if t == 1 & s == 3
+                    % ----- calculate amplitude of baseline ppTMS -----
+                    figure_title = sprintf('Subject n. %d: %s, pre medication, ppTMS', ...
+                        participant(p), medication{m});                                       
+
+                    % choose data 
+                    data_visual = double(squeeze(GABA_GFP(m, 1, 3, p, :))); 
+                    for e = 1:30
+                        data_topoplot(1, e, 1, 1, 1, :) = squeeze(GABA_data(m, t, s, p, e, :));
+                    end
+
+                    % launch summary figure 
+                    fig = figure(figure_counter); 
+                    hold on
+
+                    % initiate the main plot  
+                    subplot(4, 6, 1:18)
+                    plot(x, data_visual, ':b')
+                    yl = get(gca, 'ylim'); 
+                    xlim(time_window);
+                    rectangle('Position', [-0.005, yl(1)+0.01, 0.015, yl(2) - yl(1) - 0.02], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')                
+                    line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+
+                    % loop through peaks
+                    for k = 1:length(GABA_TEP_default.peak)                 
+                        % define default TOI 
+                        center = GABA_GFP_peaks.latency(m, 1, 2, p, k); 
+                        span = GABA_TEP_default.span(k);
+
+                        % calculate mean amplitude
+                        [amplitude, averaged_x, averaged_data] = GFP_amplitude_fixed(data_visual', center, span, percent, xstep, time_window(1)); 
+
+                        % record outcome variables
+                        GABA_GFP_peaks_fixed.latency(m, t, s, p, k) = GABA_GFP_peaks.latency(m, 1, 2, p, k);  
+                        GABA_GFP_peaks_fixed.amplitude(m, t, s, p, k) = amplitude;  
+
+                        % update the main figure
+                        figure(fig)
+                        subplot(4, 6, 1:18)
+                        hold on
+
+                        %plot the shading
+                        for a = 1:length(averaged_x)
+                            line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+                            hold on
+                        end
+
+                        % add topoplot
+                        subplot(4, 6, 18+k)
+                        topo_plot(header, data_topoplot, center, time_window(1), map_lims(s, :));  
+
+                        % shift down
+                        pos = get(gca, 'Position');
+                        pos(2) = pos(2) - 0.05;
+                        set(gca, 'Position', pos);
+
+                        % add timing
+                        text(-0.3, -0.8, sprintf('%s', GABA_TEP_default.peak{k}), 'Color', [1 0 0], 'FontSize', 14)
+                    end 
+                    
+                    % finalize the summary figure
+                    figure(fig)
+                    sgtitle(figure_title)
+
+                    % replot the data to make it visible
+                    subplot(4, 6, 1:18)
+                    hold on
+                    plot(x, data_visual, 'color', [0 0 0], 'LineWidth', 2)
+                    line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)                
+
+                    % add other parameters
+                    set(gca, 'Fontsize', 14)
+                    ylabel('GFP (\muV)')
+                    xlabel('time (s)')                
+                    hold off
+
+                    % change figure size
+                    fig.Position = [250 250 650 550];
+
+                    % name and save figure
+                    if participant(p) < 10
+                        subj = ['0' num2str(participant(p))];
+                    else
+                        subj = num2str(participant(p));
+                    end
+                    figure_name = ['GFP_' target '_peaks_' subj '_' medication{m} '_' time{t} '_' stimulus{s}];
+                    savefig([folder_figures '\GFP amplitude\' figure_name '.fig'])
+                    saveas(fig, [folder_figures '\GFP amplitude\' figure_name '.png'])
+                    close(fig)
+
+                    % update the figure counter
+                    figure_counter = figure_counter + 1;                      
+                    
+                elseif t == 2
+                    % ----- calculate amplitude of post TEPs -----
+                    figure_title = sprintf('Subject n. %d: %s, post medication, %s', ...
+                        participant(p), medication{m}, stimulus{s});                                       
+
+                    % choose data 
+                    data_visual = double(squeeze(GABA_GFP(m, 2, s, p, :))); 
+                    for e = 1:30
+                        data_topoplot(1, e, 1, 1, 1, :) = squeeze(GABA_data(m, t, s, p, e, :));
+                    end
+
+                    % launch summary figure 
+                    fig = figure(figure_counter); 
+                    hold on
+
+                    % initiate the main plot  
+                    subplot(4, 6, 1:18)
+                    plot(x, data_visual, ':b')
+                    yl = get(gca, 'ylim'); 
+                    xlim(time_window);
+                    rectangle('Position', [-0.005, yl(1)+0.01, 0.015, yl(2) - yl(1) - 0.02], 'FaceColor', [0.75 0.75 0.75], 'EdgeColor', 'none')                
+                    line([0, 0], yl, 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5)
+                    
+                    % loop through peaks
+                    for k = 1:length(GABA_TEP_default.peak)                 
+                        % define default TOI 
+                        center = GABA_GFP_peaks.latency(m, 1, s, p, k); 
+                        span = GABA_TEP_default.span(k);
+
+                        % calculate mean amplitude
+                        [amplitude, averaged_x, averaged_data] = GFP_amplitude_fixed(data_visual', center, span, percent, xstep, time_window(1)); 
+
+                        % record outcome variables
+                        GABA_GFP_peaks_fixed.latency(m, t, s, p, k) = GABA_GFP_peaks.latency(m, 1, s, p, k);  
+                        GABA_GFP_peaks_fixed.amplitude(m, t, s, p, k) = amplitude;  
+
+                        % update the main figure
+                        figure(fig)
+                        subplot(4, 6, 1:18)
+                        hold on
+
+                        %plot the shading
+                        for a = 1:length(averaged_x)
+                            line([averaged_x(a), averaged_x(a)], [0, averaged_data(a)], 'Color', 'red', 'LineWidth', 1)
+                            hold on
+                        end
+
+                        % add topoplot
+                        subplot(4, 6, 18+k)
+                        topo_plot(header, data_topoplot, center, time_window(1), map_lims(s, :));  
+
+                        % shift down
+                        pos = get(gca, 'Position');
+                        pos(2) = pos(2) - 0.05;
+                        set(gca, 'Position', pos);
+
+                        % add timing
+                        text(-0.3, -0.8, sprintf('%s', GABA_TEP_default.peak{k}), 'Color', [1 0 0], 'FontSize', 14)
+                    end 
+                    
+                    % finalize the summary figure
+                    figure(fig)
+                    sgtitle(figure_title)
+
+                    % replot the data to make it visible
+                    subplot(4, 6, 1:18)
+                    hold on
+                    plot(x, data_visual, 'color', [0 0 0], 'LineWidth', 2)
+                    line(x, zeros(length(x)), 'LineStyle', ':', 'Color', [0, 0, 0], 'LineWidth', 1)                
+
+                    % add other parameters
+                    set(gca, 'Fontsize', 14)
+                    ylabel('GFP (\muV)')
+                    xlabel('time (s)')                
+                    hold off
+
+                    % change figure size
+                    fig.Position = [250 250 650 550];
+
+                    % name and save figure
+                    if participant(p) < 10
+                        subj = ['0' num2str(participant(p))];
+                    else
+                        subj = num2str(participant(p));
+                    end
+                    figure_name = ['GFP_' target '_peaks_' subj '_' medication{m} '_' time{t} '_' stimulus{s}];
+                    savefig([folder_figures '\GFP amplitude\' figure_name '.fig'])
+                    saveas(fig, [folder_figures '\GFP amplitude\' figure_name '.png'])
+                    close(fig)
+
+                    % update the figure counter
+                    figure_counter = figure_counter + 1;        
+                else
+                    for k = 1:length(GABA_TEP_default.peak)   
+                        GABA_GFP_peaks_fixed.latency(m, t, s, p, k) = GABA_GFP_peaks.latency(m, t, s, p, k);
+                        GABA_GFP_peaks_fixed.amplitude(m, t, s, p, k) = GABA_GFP_peaks.amplitude(m, t, s, p, k); 
+                    end
+                end  
+            end
+        end
+    end
+end
+clear p m s figure_title data_visual e data_topoplot fig yl
+
+% save data in a R-compatible table 
+if ~exist('GABA_GFP_peak_table')
+    GABA_GFP_peak_fixed_table = table;
+end
+row_counter = height(GABA_GFP_peak_fixed_table) + 1;
+for p = 1:length(participant) 
+    for m = 1:length(medication)  
+        for t = 1:length(time)
+            for s = 1:length(stimulus)
+                for k = 1:length(GABA_TEP_default.peak) 
+                    %fill in the table
+                    GABA_GFP_peak_fixed_table.subject(row_counter) = participant(p);
+                    GABA_GFP_peak_fixed_table.medication(row_counter) = medication(m);
+                    GABA_GFP_peak_fixed_table.time(row_counter) = time(t);
+                    GABA_GFP_peak_fixed_table.stimulus(row_counter) = stimulus(s);
+                    GABA_GFP_peak_fixed_table.peak(row_counter) = GABA_TEP_default.peak(k);
+                    GABA_GFP_peak_fixed_table.amplitude(row_counter) = GABA_GFP_peaks_fixed.amplitude(m, t, s, p, k);
+                    GABA_GFP_peak_fixed_table.latency(row_counter) = GABA_GFP_peaks_fixed.latency(m, t, s, p, k);
+                    
+                    % update the counter
+                    row_counter = row_counter + 1;
+                end
+            end
+        end
+    end
+end
+clear m tm s p k row_counter
+writetable(GABA_GFP_peak_fixed_table, 'GABA_GFP_peak_fixed_table.csv')
+
+% add to results
+load('GABA_YC_M1_results.mat')
+
+% append new variables to the general MATLAB file
+save(output_file, 'GABA_GFP_peaks_fixed', '-append');
+
+clear p m s k amplitude averaded_data averaged_x center figure_name map_lims percent pos span step subj t 
