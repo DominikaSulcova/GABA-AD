@@ -1148,7 +1148,8 @@ fig = correlation_preview(data_cor, varnames, 'method', 'Spearman');
 % save figure
 fig_name = 'corr_TEPxMEP_ranked_overview';
 savefig([folder_figures '\' fig_name '.fig'])
-saveas(fig, [folder_figures '\' fig_name  '.png'])               
+saveas(fig, [folder_figures '\' fig_name  '.png'])
+figure_counter = figure_counter + 1;
 clear fig fig_name
 
 % ----- significant ranked correlation -----  
@@ -1224,12 +1225,14 @@ clear m p k
 
 % ----- overview of correlation between all variables - ranked data -----             
 % create correlation matrix
+fig = correlation_preview(data_cor, varnames, 'method', 'Pearson'); 
 fig = correlation_preview(data_cor, varnames, 'method', 'Spearman'); 
 
 % save figure
 fig_name = 'corr_TEPxMEP_bl_ranked_overview';
 savefig([folder_figures '\' fig_name '.fig'])
-saveas(fig, [folder_figures '\' fig_name  '.png'])               
+saveas(fig, [folder_figures '\' fig_name  '.png'])   
+figure_counter = figure_counter + 1;
 clear varnames fig fig_name
 
 %% 14) CORRELATION: TEP change x RS-EEG change
