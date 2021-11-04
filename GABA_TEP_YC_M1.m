@@ -79,10 +79,7 @@ folder_git = uigetdir(pwd, 'Choose the Git folder');
 
 % load default header
 load([folder_git '\GABA_header_default.mat'])
-for l = 1:size(header.chanlocs, 2)
-    labels{l} = header.chanlocs(l).labels;
-end
-clear l
+labels = {header.chanlocs.labels};
 
 % visualization calculated params
 figure_counter = 1;
@@ -1163,8 +1160,7 @@ for p = 1:length(participant)
             end
             
             % average across eois
-            if s == 1 & k == 6
-            else
+            if length(eoi) > 1
                 data_visual = squeeze(mean(data_visual, 2));
             end
             
@@ -1193,7 +1189,7 @@ for p = 1:length(participant)
                 hold on
                 rectangle('Position', [center - span/2, yl(1), span, yl(2)-yl(1)], 'FaceColor', [1,0.7608,0.7608], 'EdgeColor', 'none')
 
-                % calculate mean amplitude
+                % extract amplitude and latency
                 [y_mean, y_max, lat_peak] = TEP_amplitude(data_visual, center, span, percent, xstep, xstart, polarity);
 
                 % update the figure
