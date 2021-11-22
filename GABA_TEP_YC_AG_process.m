@@ -879,7 +879,7 @@ peak_n = 1:length(GABA_TEP_default.peak);
 
 
 % calculate individual TEP change for each peak   
-for p = 2:length(participant)
+for p = 1:length(participant)
     for m = 1:length(medication)
         for k = 1:length(GABA_TEP_default.peak)
             GABA_TEP_peaks.change(p, m, k, 1) = GABA_TEP_peaks.amplitude_mean(m, 2, p, k)...

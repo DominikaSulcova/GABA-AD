@@ -1,0 +1,214 @@
+---
+title: "GABA-AD, YC: MLM"
+output: html_notebook
+chunk_output_type: inline
+---
+
+```{r chunk_setup, include = FALSE, eval = TRUE}
+knitr::opts_chunk$set(echo = T, message = F, warning = F, comment=NA, autodep = F, eval = T, cache.rebuild = F, cache = T, R.options = list(width = 120), fig.width = 8, fig.align = 'center', dev.args = list(bg = 'transparent'), dev = 'svglite')
+```
+
+## Effect of pharmacological actvation of GABAARs
+### Outcome variables
+- **TEPs**: 2 DVs measured separately for each TEP component (5 M1-CS-TEPs, AG-TEPs)
+  - **peak amplitude** 
+  - **latency** 
+- **RS-EEG**: 4 DVs
+  - mean power across the lower beta band = **sigma**
+  - mean power across the delta band = **delta**
+  - **Alpha Attenuation Coefficient** (eyes closed/eyes open)
+  - **Spectral Exponent** of the 1/f slope
+        
+All outcome variables are presented as the difference between the value post-medication and the value at baseline
+
+### Fixed effects
+- **MEDICATION** - binomial 
+  0. placebo = control condition
+  1. amplrazolam
+  
+- Covariate: **rMT change** - continuous value
+  
+- Covariate: **baseline value** of outcome variables
+  - continuous value
+
+### Hierarchy in the model
+- 2 levels
+- nested within **SUBJECT**: to account for unknown interpersonal variability
+
+Following pipeline treats each outcome measure separately, as an independent measure
+
+## Data visualization
+Load packages
+```{r basic_packages, include = FALSE, eval = TRUE}
+library(tidyverse)
+library(ggplot2)
+library(MASS)
+library(dplyr)
+library(ggpubr)
+library(corrplot) 
+library(visreg) 
+library(rgl)
+library(knitr)
+library(scatterplot3d)
+library(merTools)
+library(readr)
+```
+
+Set graphic parameters for visualization
+```{r graphic pars}
+# color palette - red/blue/purple/green(light + dark)
+col_palette = c('cadetblue1', 'turquoise4', 'tomato1', 'red3', 'mediumorchid1', 'darkmagenta', 'olivedrab3', 'olivedrab4')
+```
+
+Import data in R-compatible long format
+```{r import}
+folder_dir <- choose.dir(default = getwd(), caption = "Select folder for input/output")
+data_all <- read.csv(paste(folder_dir, '\\GABA_YC_medication_TEP.csv', sep = ""))
+head(data_all, 10)
+```
+
+Choose the outcome variable of interest 
+```{r choose data}
+# define outcome variable of interest
+# outcome_var <- 'M1_amp_P180'
+# peak_names <- c('P30', 'N45', 'P60', 'N100', 'P180')
+outcome_var <- 'AG_amp_P180'
+peak_names <- c('P25', 'N40', 'P50', 'N75', 'N100', 'P180')
+vars_keep <- c('subject', 'medication', 'rMT', outcome_var)
+
+# index the peak 
+index = 6
+
+# make into factors
+data <- as_tibble(data_all[vars_keep]) 
+data$subject <- factor(data$subject)
+data$medication <- factor(data$medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)
+
+# rename dependent variable
+data <- rename(data, TEP_change = AG_amp_P180)
+head(data, 10)
+```
+
+Descriptive statistics 
+```{r desctiptive}
+describe <- function(x){
+  print(round(c(mean = mean(x, na.rm = TRUE),
+            median = median(x, na.rm = TRUE),
+            min = min(x, na.rm = TRUE),
+            max = max(x, na.rm = TRUE),
+            std = sd(x, na.rm = TRUE)), digits = 4))}
+
+describe(data$TEP_change)
+cat('grouped by medication: \n')
+aggregate(TEP_change ~ medication, data = data, FUN = describe)
+```
+
+Test for normality
+```{r first look}
+# placebo
+data_placebo <- data$TEP_change[data$medication == 'placebo']
+shapiro.test(data_placebo)
+qqnorm(data_placebo)
+qqline(data_placebo)
+
+# alprazolam
+data_alprazolam <- data$TEP_change[data$medication == 'alprazolam']
+shapiro.test(data_alprazolam)
+qqnorm(data_alprazolam)
+qqline(data_alprazolam)
+```
+## Statistical analysis using generalized linear mixed models
+Load packages
+```{r glmm_packages, include = FALSE, eval = TRUE}
+library(nlme)
+library(lmerTest)
+library(car)
+library(lattice)
+```
+
+Empty model with random intercept
+```{r contrasts}
+# create the model
+model_empty <- lme(
+  TEP_change ~ 1,
+  random = ~ 1|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_empty)
+
+# confidence intervals
+intervals(model_empty)
+```
+
+Random intercept
+```{r contrasts}
+# create the model
+model_ri <- lme(
+  TEP_change ~ medication,
+  random = ~ 1|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_ri)
+
+# confidence intervals
+intervals(model_ri)
+```
+
+Random intercept + random slope
+```{r contrasts}
+# create the model
+model_rirs <- lme(
+  TEP_change ~ medication,
+  random = ~ medication|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_rirs)
+
+# confidence intervals
+intervals(model_rirs)
+```
+
+Full model with covariate
+```{r contrasts}
+# center the covariate
+rMT_centered <- vector()
+for(i in 1:length(data$rMT)){
+  if(data$medication[i] == 'placebo'){
+    rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'placebo'])
+  } 
+  if(data$medication[i] == 'alprazolam'){
+    rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'alprazolam'])
+  }
+} 
+data$rMT_centered <- rMT_centered
+
+# create the model
+model_rirscov <- lme(
+  TEP_change ~ medication + rMT_centered,
+  random = ~ medication|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_rirscov)
+
+# confidence intervals
+intervals(model_rirscov, which = 'fixed')
+
+# compare all models using ANOVA
+anova(model_empty, model_ri, model_rirs, model_rirscov)
+
+# fixed effects
+broom.mixed::tidy(model_rirscov, effects = 'fixed')
+
+# fixed effects
+broom.mixed::tidy(model_rirscov, effects = 'ran_pars')
+
+# residuals
+plot(model_rirscov)
+qqnorm(model_rirscov)
+```
+
+

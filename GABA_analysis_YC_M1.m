@@ -558,6 +558,28 @@ clear row_cnt p m s c statement
 % save as CSV
 writetable(GABA_med_long, 'GABA_med_long.csv', 'Delimiter', ',');
 
+% export epochs into .xlsx file
+TEP_epochs = table;
+row_counter = 1;
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for s = 1:length(stimulus)
+            TEP_epochs.medication(row_counter) = medication(m);
+            TEP_epochs.time(row_counter) = time(t);
+            TEP_epochs.stimulus(row_counter) = stimulus(s);
+            statement = ['TEP_epochs.epochs(row_counter) = mean(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s));'];
+            eval(statement)
+            statement = ['TEP_epochs.epochs_std(row_counter) = std(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s));'];
+            eval(statement)
+            statement = ['TEP_epochs.epochs_sem(row_counter) = (std(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s)))/sqrt(length(participant));'];
+            eval(statement)
+            row_counter = row_counter + 1;
+        end
+    end
+end
+clear m t s statement row_counter
+writetable(TEP_epochs, [folder_output '\GABA_YC_ranova.xlsx'],  'Sheet', 'M1 - TEP epochs')
+
 %% 7) RANOVA: arousal
 timepoint = {'1.5h' '2h' '2.5h'};
 

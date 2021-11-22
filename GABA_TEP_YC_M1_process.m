@@ -1415,7 +1415,7 @@ col = colours([2, 4], :);
 measures = {'mean amplitude' 'peak amplitude' 'latency'};
 
 % calculate individual TEP change for each peak   
-for p = 2:length(participant)
+for p = 1:length(participant)
     for m = 1:length(medication)
         for s = 1:length(stimulus)
             for k = 1:length(GABA_TEP_default.peak)
