@@ -1,5 +1,5 @@
 ---
-title: "GABA-AD, YC: MLM"
+title: "GABA-AD, YC: mixed models"
 output: html_notebook
 chunk_output_type: inline
 ---
@@ -27,9 +27,6 @@ All outcome variables are presented as the difference between the value post-med
   1. amplrazolam
   
 - Covariate: **rMT change** - continuous value
-  
-- Covariate: **baseline value** of outcome variables
-  - continuous value
 
 ### Hierarchy in the model
 - 2 levels
