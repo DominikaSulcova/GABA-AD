@@ -30,41 +30,152 @@ All outcome variables are presented as the difference between the value post-med
 
 ### Hierarchy in the model
 - 2 levels
-- nested within **SUBJECT**: to account for unknown interpersonal variability
+- nested within **SUBJECT**
 
 Following pipeline treats each outcome measure separately, as an independent measure
 
-## Data visualization
-Load packages
-```{r basic_packages, include = FALSE, eval = TRUE}
+# Setup
+```{r setup, include = FALSE, eval = TRUE}
+# load packages
 library(tidyverse)
 library(ggplot2)
-library(MASS)
-library(dplyr)
 library(ggpubr)
 library(corrplot) 
 library(visreg) 
-library(rgl)
 library(knitr)
-library(scatterplot3d)
-library(merTools)
 library(readr)
-```
+library(nlme)
+library(lmerTest)
+library(car)
 
-Set graphic parameters for visualization
-```{r graphic pars}
+# directories
+folder_dir <- choose.dir(default = getwd(), caption = "Select folder for input/output")
+figures_dir <- paste(folder_dir, '\\figures', sep = "")
+dir.create(figures_dir)
+
 # color palette - red/blue/purple/green(light + dark)
 col_palette = c('cadetblue1', 'turquoise4', 'tomato1', 'red3', 'mediumorchid1', 'darkmagenta', 'olivedrab3', 'olivedrab4')
 ```
 
-Import data in R-compatible long format
-```{r import}
-folder_dir <- choose.dir(default = getwd(), caption = "Select folder for input/output")
-data_all <- read.csv(paste(folder_dir, '\\GABA_YC_medication_TEP.csv', sep = ""))
+### RS-EEG
+```{r RS-EEG}
+# import the data
+input_file <- 'GABA_YC_medication_rsEEG.csv'
+data_all <- read.csv(paste(folder_dir, '\\', input_file, sep = ""))
 head(data_all, 10)
 ```
 
-Choose the outcome variable of interest 
+RS-EEG: Choose the outcome variable of interest 
+```{r choose data}
+outcome_var <- 'sigma'
+var_names <- c('sigma', 'delta', 'AAC', 'SE')
+vars_keep <- c('subject', 'medication', outcome_var)
+
+# index the peak 
+index = 1
+
+# make into factors
+data <- as_tibble(data_all[vars_keep]) 
+data$subject <- factor(data$subject)
+data$medication <- factor(data$medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)
+
+# rename dependent variable
+data <- rename(data, DV_change = sigma)
+head(data, 10)
+```
+
+RS-EEG: Descriptive statistics 
+```{r desctiptive}
+describe(data$DV_change)
+cat('grouped by medication: \n')
+aggregate(DV_change ~ medication, data = data, FUN = describe)
+```
+
+RS-EEG: Test for normality
+```{r first look}
+# placebo
+data_placebo <- data$DV_change[data$medication == 'placebo']
+shapiro.test(data_placebo)
+qqnorm(data_placebo)
+qqline(data_placebo)
+
+# alprazolam
+data_alprazolam <- data$DV_change[data$medication == 'alprazolam']
+shapiro.test(data_alprazolam)
+qqnorm(data_alprazolam)
+qqline(data_alprazolam)
+```
+
+## RS-EEG: Statistical analysis using generalized linear mixed models
+RS-EEG: Empty model with random intercept
+```{r empty model}
+# create the model
+model_empty <- lme(
+  DV_change ~ 1,
+  random = ~ 1|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_empty)
+
+# confidence intervals
+intervals(model_empty)
+```
+
+RS-EEG: Random intercept
+```{r random intercept}
+# create the model
+model_ri <- lme(
+  DV_change ~ medication,
+  random = ~ 1|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_ri)
+
+# confidence intervals
+intervals(model_ri)
+```
+
+RS-EEG: Random intercept + random slope
+```{r full model}
+# create the model
+model_rirs <- lme(
+  DV_change ~ medication,
+  random = ~ medication|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_rirs)
+
+# confidence intervals
+intervals(model_rirs)
+
+# compare all models using ANOVA
+anova(model_empty, model_ri, model_rirs)
+
+# fixed effects
+broom.mixed::tidy(model_rirs, effects = 'fixed')
+
+# fixed effects
+broom.mixed::tidy(model_rirs, effects = 'ran_pars')
+
+# residuals
+plot(model_rirs)
+qqnorm(model_rirs)
+```
+
+
+
+TEPs
+```{r import}
+
+input_file <- 'GABA_YC_medication_TEP.csv'
+data_all <- read.csv(paste(folder_dir, '\\', input_file, sep = ""))
+head(data_all, 10)
+```
+
+TEPs: Choose the outcome variable of interest 
 ```{r choose data}
 # define outcome variable of interest
 # outcome_var <- 'M1_amp_P180'
@@ -86,7 +197,7 @@ data <- rename(data, TEP_change = AG_amp_P180)
 head(data, 10)
 ```
 
-Descriptive statistics 
+TEPs: Descriptive statistics 
 ```{r desctiptive}
 describe <- function(x){
   print(round(c(mean = mean(x, na.rm = TRUE),
@@ -100,7 +211,7 @@ cat('grouped by medication: \n')
 aggregate(TEP_change ~ medication, data = data, FUN = describe)
 ```
 
-Test for normality
+TEPs: Test for normality
 ```{r first look}
 # placebo
 data_placebo <- data$TEP_change[data$medication == 'placebo']
@@ -114,7 +225,8 @@ shapiro.test(data_alprazolam)
 qqnorm(data_alprazolam)
 qqline(data_alprazolam)
 ```
-## Statistical analysis using generalized linear mixed models
+
+## TEPs: Statistical analysis using generalized linear mixed models
 Load packages
 ```{r glmm_packages, include = FALSE, eval = TRUE}
 library(nlme)
@@ -123,7 +235,7 @@ library(car)
 library(lattice)
 ```
 
-Empty model with random intercept
+TEPs: Empty model with random intercept
 ```{r contrasts}
 # create the model
 model_empty <- lme(
@@ -138,7 +250,7 @@ summary(model_empty)
 intervals(model_empty)
 ```
 
-Random intercept
+TEPs: Random intercept
 ```{r contrasts}
 # create the model
 model_ri <- lme(
@@ -153,7 +265,7 @@ summary(model_ri)
 intervals(model_ri)
 ```
 
-Random intercept + random slope
+TEPs: Random intercept + random slope
 ```{r contrasts}
 # create the model
 model_rirs <- lme(
@@ -168,7 +280,7 @@ summary(model_rirs)
 intervals(model_rirs)
 ```
 
-Full model with covariate
+TEPs: Full model with covariate
 ```{r contrasts}
 # center the covariate
 rMT_centered <- vector()
@@ -207,5 +319,7 @@ broom.mixed::tidy(model_rirscov, effects = 'ran_pars')
 plot(model_rirscov)
 qqnorm(model_rirscov)
 ```
+
+
 
 

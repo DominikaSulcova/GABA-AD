@@ -73,6 +73,11 @@ data_M1 = squeeze(GABA_TEP_peaks.change(:, :, 1, 2:6, [2 3]));
 peaks_M1 = GABA_TEP_default.peak(2:6); 
 sprintf('M1 - datasize: %s', num2str(size(data_M1)))
 
+load([folder_input '\' input_file_M1], 'GABA_TEP_peaks', 'GABA_TEP_default');
+data_M1 = squeeze(GABA_TEP_peaks.change(:, :, 2, :, [2 3]));
+peaks_M1 = GABA_TEP_default.peak; 
+sprintf('M1 - datasize: %s', num2str(size(data_M1)))
+
 % TEPs from AG
 load([folder_input '\' input_file_AG], 'GABA_TEP_peaks', 'GABA_TEP_default');
 data_AG = squeeze(GABA_TEP_peaks.change(:, :, :, [2 3]));
@@ -394,6 +399,33 @@ for p = 1:length(participant)
 end
 clear m t s p k row_counter
 writetable(GABA_YC_medication_TEP, [folder_output '\GABA_YC_medication_TEP.csv'])
+
+%% 4) EFFECT OF ALPRAZOLAM - TEPs: export for R
+GABA_YC_medication_TEP_TS = table;
+row_counter = 1;
+for p = 1:length(participant) 
+    for m = 1:length(medication)  
+        % independent variables
+        GABA_YC_medication_TEP_TS.subject(row_counter) = participant(p);
+        GABA_YC_medication_TEP_TS.medication(row_counter) = medication(m); 
+                
+        % covariate
+        GABA_YC_medication_TEP_TS.rMT(row_counter) = GABA_YC_results.rmt(m).change(p);  
+                
+        % dependent variables - M1 
+        for k = 1:length(peaks_M1)             
+            statement = ['GABA_YC_medication_TEP_TS.M1_amp_' peaks_M1{k} '(row_counter) = data_M1(p, m, k, 1);'];
+            eval(statement)
+            statement = ['GABA_YC_medication_TEP_TS.M1_lat_' peaks_M1{k} '(row_counter) = data_M1(p, m, k, 2);'];
+            eval(statement)                
+        end
+                    
+        % update the counter
+        row_counter = row_counter + 1;
+    end
+end
+clear m t s p k row_counter
+writetable(GABA_YC_medication_TEP_TS, [folder_output '\GABA_YC_medication_TEP_TS.csv'])
 
 %% 5) EFFECT OF ALPRAZOLAM - RS-EEG: load the data
 for m = 1:length(medication)
