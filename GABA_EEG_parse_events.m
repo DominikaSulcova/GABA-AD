@@ -1,7 +1,7 @@
 %% PARSE EVENTS ACCORDING TO EXPERIMENTAL CONDITIONS
 % Written by Domi for GABA-AD project (2019)
 % 
-% 1) Loads the order of events for each participant (.xlsx file)
+% 1) Loads the order of events for each participant (.xlsx file or .mat file)
 % 2) Loads header for each relevant dataset, assigns codes to events, saves 
 % 
 % Important:   
@@ -13,18 +13,18 @@ clear all
 clc
 
 subj_group = 'CNRAD';
-participant = [302 303 306 307 308 310];
+participant = [302 303 305 306 307 308 310 313 315];
 time = {'pre' 'post'};
 block = 1:3;
 
-prefix_EEG = 'ds art-sup ep dc reref YC';
+prefix_EEG = 'ds art-sup ep dc reref';
 prefix_EMG = 'bl ep notch but dc YC';
 
 %% parse events in all relevant datafiles
 % switch according to the subject group
 switch subj_group
     case 'MCI'
-        sg = 'P';
+        sg = 'M';
     case 'MCI-CTRL'
         sg = 'C';
     case 'CNRAD'

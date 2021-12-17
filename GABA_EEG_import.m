@@ -48,6 +48,9 @@ definput = {[num2str(group_n) '00']};
 session_info{2} = inputdlg(prompt,dlgtitle,dims,definput);
 clear prompt dlgtitle dims definput group_n
 
+% EEG event
+event_code = 'Stimulation';
+
 %% create a logfile
 % get the date
 prompt = {'Date of recording :'};
@@ -131,7 +134,6 @@ end
 % dataset parameters
 block = {'b1' 'b2' 'b3'};
 prefix = ['EEG M1 ' char(session_info{1}) ' ' char(session_info{2})];
-event_code = 'Stimulation';
 
 % % ------------------- WHEN RUNNING SECTION BY SECTION -------------------
 % % check for validity of raw data location 
