@@ -229,8 +229,8 @@ library(car)
 library(lattice)
 ```
 
-TEPs: Empty model with random intercept
-```{r contrasts}
+Empty model with random intercept
+```{r empty}
 # create the model
 model_empty <- lme(
   TEP_change ~ 1,
@@ -244,8 +244,8 @@ summary(model_empty)
 intervals(model_empty)
 ```
 
-TEPs: Random intercept
-```{r contrasts}
+Random intercept
+```{r ri}
 # create the model
 model_ri <- lme(
   TEP_change ~ medication,
@@ -259,8 +259,8 @@ summary(model_ri)
 intervals(model_ri)
 ```
 
-TEPs: Random intercept + random slope
-```{r contrasts}
+Random intercept + random slope
+```{r ri + rs}
 # create the model
 model_rirs <- lme(
   TEP_change ~ medication,
@@ -274,8 +274,8 @@ summary(model_rirs)
 intervals(model_rirs)
 ```
 
-TEPs: Full model with covariate
-```{r contrasts}
+Full model with covariate
+```{r ri + rs + cov}
 # center the covariate
 rMT_centered <- vector()
 for(i in 1:length(data$rMT)){
