@@ -425,7 +425,7 @@ save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
 
 %% 5) SICI 
 % load data
-load([folder_input '\GABA_YC_M1_TEPs.mat'], 'GABA_SICI_peaks');
+load([folder_input '\GABA_YC_M1_TEPs.mat'], 'GABA_SICI_peaks', 'GABA_SICI');
 
 % calculate change in MEPs
 for p = 1:length(participant)
@@ -485,9 +485,24 @@ for p = 1:length(participant)
 end
 clear p m k polarity
 
+% fill in TEP SICI GFP_AUC
+for p = 1:length(participant)
+    for m = 1:length(medication) 
+        % baseline
+        GABA_YC_results.SICI(m).GFP_AUC.pre(p) = GABA_SICI.GFP_AUC(m, 1, p);
+
+        % post medication
+        GABA_YC_results.SICI(m).GFP_AUC.post(p) = GABA_SICI.GFP_AUC(m, 2, p);
+
+        % change
+        GABA_YC_results.SICI(m).GFP_AUC.change(p) = (GABA_SICI.GFP_AUC(m, 2, p)/GABA_SICI.GFP_AUC(m, 1, p)) * 100;
+    end
+end
+clear p m 
+
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
-clear GABA_SICI_peaks
+clear GABA_SICI_peaks GABA_SICI
 
 %% 6) export data for R
 % pharmacological activation of GABAARs
@@ -1451,6 +1466,116 @@ for m = 1:length(medication)
     end
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
+
+
+%% 15) CORRELATION: TEP SICI x MEP SICI 
+% variable names
+varnames = {'TEP-SICI' 'MEP-SICI'};
+
+% ----- extract data: baseline -----
+for m = 1:length(medication)
+    for p = 1:length(participant) 
+        % TEP-SICI 
+        data_cor((m-1)*length(participant) + p, 1) = GABA_YC_results.SICI(m).GFP_AUC.pre(p);
+
+        % MEP-SICI
+        data_cor((m-1)*length(participant) + p, 2) = GABA_YC_results.SICI(m).MEP.pre(p);
+    end
+end
+clear m p 
+
+% ----- significant linear correlation -----
+% identify significant cases        
+[cor_coef, cor_p] = corrcoef(data_cor);
+[row, col] = find(cor_p < alpha);
+
+% plot significant cases
+for a = 1:length(row)/2    
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+          
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_cor = plotAdded(data_model);
+
+    % adjust parameters    
+    title(sprintf('Linear correlation - baseline:\n%s ~ %s', varnames{col(a)}, varnames{row(a)}))
+    xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+    set(gca, 'FontSize', 14)
+    plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+    plot_cor(1).MarkerEdgeColor = colours(2, :); plot_cor(1).MarkerFaceColor = colours(2, :);
+    plot_cor(2).Color = colours(3, :); plot_cor(2).LineWidth = 2; 
+    plot_cor(3).Color = colours(3, :); plot_cor(3).LineWidth = 2;
+    legend off
+    if data_model.Coefficients.Estimate(2) > 0
+        text_pos = [0.95 0.85 0.75];
+    else
+        text_pos = [0.25 0.15 0.05];
+    end
+    T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+    T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+    T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+    set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+    set(T(2), 'fontsize', 14); 
+    set(T(3), 'fontsize', 14, 'color', colours(3, :)); 
+
+    % save figure and continue
+    fig_name = ['corr_TEP-SICI_GFP_AUCxMEP-SICI_linear_' varnames{row(a)} '_' varnames{col(a)}];
+    savefig([folder_figures '\' fig_name '.fig'])
+    saveas(fig, [folder_figures '\' fig_name  '.png'])  
+    figure_counter = figure_counter + 1;
+end
+clear cor_coef alpha_cor cor_p data_model plot_cor row col fig fig_name T text_pos a temp alpha_cor
+
+% ----- significant ranked correlation -----   
+% identify significant cases        
+[cor_coef, cor_p] = corr(data_cor, 'Type', 'Spearman');
+[row, col] = find(cor_p < alpha);
+
+% rank the data
+for a = 1:size(data_cor, 2)
+    [temp, data_cor(:, a)]  = ismember(data_cor(:, a), unique(data_cor(:, a)));
+end
+
+% plot significant cases
+for a = 1:length(row)/2    
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_cor = plotAdded(data_model);
+
+    % adjust parameters    
+    title(sprintf('Spearman rank correlation - baseline:\n%s ~ %s', varnames{col(a)}, varnames{row(a)}))
+    xlabel(['change in ' varnames{row(a)}]); ylabel(['change in ' varnames{col(a)}]);
+    set(gca, 'FontSize', 14)
+    plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+    plot_cor(1).MarkerEdgeColor = colours(2, :); plot_cor(1).MarkerFaceColor = colours(2, :);
+    plot_cor(2).Color = colours(3, :); plot_cor(2).LineWidth = 2; 
+    plot_cor(3).Color = colours(3, :); plot_cor(3).LineWidth = 2;
+    legend off
+    if data_model.Coefficients.Estimate(2) > 0
+        text_pos = [0.95 0.85 0.75];
+    else
+        text_pos = [0.25 0.15 0.05];
+    end
+    T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+    T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+    T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+    set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+    set(T(2), 'fontsize', 14); 
+    set(T(3), 'fontsize', 14, 'color', colours(3, :)); 
+
+    % save figure and continue
+    fig_name = ['corr_TEP-SICI_GFP_AUCxMEP-SICI_ranked_' varnames{row(a)} '_' varnames{col(a)}];
+    savefig([folder_figures '\' fig_name '.fig'])
+    saveas(fig, [folder_figures '\' fig_name  '.png'])  
+    figure_counter = figure_counter + 1;
+end
+clear varnames data_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
 
 %% 15) CORRELATION: TEP SICI x MEP SICI 
 % variable names

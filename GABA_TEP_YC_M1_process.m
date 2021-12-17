@@ -1625,6 +1625,7 @@ clear col datasize measures avg_amp avg_amp_sem
 % ----- decide output parameters -----
 electrode = {'C3'};
 linestyle = {'-' ':'};
+TOI = [0.015 0.3];
 % ------------------------------------
 % calculate individual SICI
 GABA_SICI = struct;
@@ -1843,7 +1844,6 @@ for m = 1:length(medication)
     end
 end
 clear m t p
-
 % calculate mean SICI GFP
 for m = 1:length(medication)
     for t = 1:length(time)
@@ -1875,8 +1875,60 @@ for m = 1:length(medication)
 end
 clear m t p 
 
+% calculate AUC of the SICI-GFP over the TOI
+AUC_start = (TOI(1) - time_window(1))/xstep;
+AUC_end = (TOI(2) - time_window(1))/xstep;
+for m = 1:length(medication)
+    for t = 1:length(time)
+        for p = 1:length(participant)
+            % calculate GFP (exclude target channel)
+            GABA_SICI.GFP_AUC(m, t, p) = sum(squeeze(GABA_SICI.GFP(m, t, p, :)));  
+        end
+    end
+end
+clear m t p AUC_start AUC_end
+
 % append new variable to the general MATLAB file
 save(output_file, 'GABA_SICI', '-append');
+
+% ----- plot SICI GFP-AUC -----
+% choose the data
+for m = 1:length(medication)
+    for t = 1:length(time)
+        data_visual(:, (m-1)*2 + t) = squeeze(GABA_SICI.GFP_AUC(m, t, :));
+    end
+end
+clear m t
+
+% plot group boxplot
+fig = figure(figure_counter);        
+boxplot(data_visual, 'color', colours)
+hold on
+
+% plot the lines - placebo
+for p = 1:length(participant)
+    p_placebo(p) = plot([1 2], data_visual(p, [1 2]), '-o',...
+        'Color', [0.75, 0.75, 0.75],...
+        'MarkerSize', 10,...
+        'MArkerEdge', 'none');
+    hold on
+end
+
+% plot the lines - alprazolam
+for p = 1:length(participant)
+    p_alprazolam(p) = plot([3 4], data_visual(p, [3 4]), '-',...
+        'Color', [0.75, 0.75, 0.75],...
+        'MarkerSize', 10,...
+        'MArkerEdge', 'none');
+    hold on
+end
+
+% plot the markers
+for b = 1:4
+    scat(b) = scatter(repelem(b, length(participant)), data_visual(:, b),...
+        75, colours(b, :), 'filled');
+    hold on
+end
 
 %% 13) SICI: TEP peak amplitude change
 % calculate individual change for peak amplitude of each TEP peak --> only at the baseline  

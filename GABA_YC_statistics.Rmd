@@ -10,9 +10,7 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F, comment=NA, autodep = 
 
 ## Effect of pharmacological actvation of GABAARs
 ### Outcome variables
-- **TEPs**: 2 DVs measured separately for each TEP component (5 M1-CS-TEPs, AG-TEPs)
-  - **peak amplitude** 
-  - **latency** 
+- **TEP peak amplitude**: measured separately for each TEP component (5 components) and stimulus (3 M1 TEPs sub- and supra-threshold, AG TEPs)
 - **RS-EEG**: 4 DVs
   - mean power across the lower beta band = **sigma**
   - mean power across the delta band = **delta**
@@ -21,7 +19,7 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F, comment=NA, autodep = 
         
 All outcome variables are presented as the difference between the value post-medication and the value at baseline
 
-### Fixed effects
+### Fixed effect
 - **MEDICATION** - binomial 
   0. placebo = control condition
   1. amplrazolam
@@ -57,34 +55,30 @@ dir.create(figures_dir)
 col_palette = c('cadetblue1', 'turquoise4', 'tomato1', 'red3', 'mediumorchid1', 'darkmagenta', 'olivedrab3', 'olivedrab4')
 ```
 
-### RS-EEG
-```{r RS-EEG}
+### Prepare the data
+```{r data}
 # import the data
-input_file <- 'GABA_YC_medication_rsEEG.csv'
-data_all <- read.csv(paste(folder_dir, '\\', input_file, sep = ""))
-head(data_all, 10)
+input_file <- choose.files(default = folder_dir, caption = "Select the dataset")
+data_all <- read.csv(input_file)
+str(data_all)
+
+# choose the variable of interest
+outcome_var <- readline(prompt = "Variable of interest: ")
+if('rMT' %in% names(data_all)){
+  data_type <- 'TEP'
+  vars2keep <- c('subject', 'medication', outcome_var, 'rMT')
+} else {
+  data_type <- 'rsEEG'
+  vars2keep <- c('subject', 'medication', outcome_var)
+}
+data <- data_all[vars2keep] %>% 
+  mutate(subject = factor(subject)) %>% 
+  mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
+  rename(DV_change = as.name(outcome_var))
+str(data)
 ```
 
-RS-EEG: Choose the outcome variable of interest 
-```{r choose data}
-outcome_var <- 'sigma'
-var_names <- c('sigma', 'delta', 'AAC', 'SE')
-vars_keep <- c('subject', 'medication', outcome_var)
-
-# index the peak 
-index = 1
-
-# make into factors
-data <- as_tibble(data_all[vars_keep]) 
-data$subject <- factor(data$subject)
-data$medication <- factor(data$medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)
-
-# rename dependent variable
-data <- rename(data, DV_change = sigma)
-head(data, 10)
-```
-
-RS-EEG: Descriptive statistics 
+### Descriptive statistics 
 ```{r desctiptive}
 describe(data$DV_change)
 cat('grouped by medication: \n')
