@@ -1,14 +1,22 @@
 ---
-title: "GABA-AD, YC: mixed models"
-output: html_notebook
+title: 'GABA-AD: Effect of pharmacological actvation of GABAARs'
+output: 
+  html_notebook:
+    theme: 
+      bootswatch: minty
+    toc: TRUE
 chunk_output_type: inline
 ---
 
 ```{r chunk_setup, include = FALSE, eval = TRUE}
-knitr::opts_chunk$set(echo = T, message = F, warning = F, comment=NA, autodep = F, eval = T, cache.rebuild = F, cache = T, R.options = list(width = 120), fig.width = 8, fig.align = 'center', dev.args = list(bg = 'transparent'), dev = 'svglite')
+knitr::opts_chunk$set(echo = T, message = F, warning = F, comment = NA, autodep = F, eval = T, cache.rebuild = F, cache = T, R.options = list(width = 120), fig.width = 8, fig.align = 'center', dev.args = list(bg = 'transparent'), dev = 'svglite')
 ```
 
-## Effect of pharmacological actvation of GABAARs
+## **STUDY DESCRIPTION**
+### Hypothesis
+
+### Experimental design
+
 ### Outcome variables
 - **TEP peak amplitude**: measured separately for each TEP component (5 components) and stimulus (3 M1 TEPs sub- and supra-threshold, AG TEPs)
 - **RS-EEG**: 4 DVs
@@ -30,38 +38,52 @@ All outcome variables are presented as the difference between the value post-med
 - 2 levels
 - nested within **SUBJECT**
 
+## **STATISTICAL ANALYSIS**
 Following pipeline treats each outcome measure separately, as an independent measure
 
-# Setup
+### Setup
 ```{r setup, include = FALSE, eval = TRUE}
+# report 3 significant digits
+options(digits = 3)    
+
 # load packages
+library(skimr)
+library(moments)
+library(rstatix)
 library(tidyverse)
-library(ggplot2)
 library(ggpubr)
 library(corrplot) 
 library(visreg) 
 library(knitr)
 library(readr)
 library(nlme)
-library(lmerTest)
 library(car)
 
 # directories
 folder_dir <- choose.dir(default = getwd(), caption = "Select folder for input/output")
 figures_dir <- paste(folder_dir, '\\figures', sep = "")
-dir.create(figures_dir)
+if(file.exists(figures_dir)){
+  setwd(folder_dir)
+}else {
+    dir.create(figures_dir)
+  }
 
 # color palette - red/blue/purple/green(light + dark)
 col_palette = c('cadetblue1', 'turquoise4', 'tomato1', 'red3', 'mediumorchid1', 'darkmagenta', 'olivedrab3', 'olivedrab4')
 ```
 
-### Prepare the data
+### Import data
+Choose a .csv file with either TEP or rsEEG data. 
 ```{r data}
 # import the data
 input_file <- choose.files(default = folder_dir, caption = "Select the dataset")
-data_all <- read.csv(input_file)
-str(data_all)
+data_all <- as_tibble(read.csv(input_file))
+names(data_all)
+summary(data_all)
+```
 
+### Variable of interest
+```{r variable}
 # choose the variable of interest
 outcome_var <- readline(prompt = "Variable of interest: ")
 if('rMT' %in% names(data_all)){
@@ -71,6 +93,8 @@ if('rMT' %in% names(data_all)){
   data_type <- 'rsEEG'
   vars2keep <- c('subject', 'medication', outcome_var)
 }
+
+# subset the dataset
 data <- data_all[vars2keep] %>% 
   mutate(subject = factor(subject)) %>% 
   mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
@@ -79,204 +103,207 @@ str(data)
 ```
 
 ### Descriptive statistics 
-```{r desctiptive}
-describe(data$DV_change)
-cat('grouped by medication: \n')
-aggregate(DV_change ~ medication, data = data, FUN = describe)
+The distribution is described and visualized for both levels of the factor 'medication' separately.
+The normality is checked both visually (histogram, QQ-plot) and using the Shapiro-Wilk normality test. 
+```{r desctiptives}
+# ---- DISTRIBUTION ----
+# get summary per medication
+data %>% 
+  select(c(DV_change, medication)) %>% 
+  group_by(medication) %>% 
+  skim()
+
+# calculate mean and median
+data_mean <- data %>% 
+  group_by(medication) %>% 
+  summarise(mean = mean(DV_change), median = median(DV_change))
+data_mean %>% 
+  knitr::kable()
+
+# plot by mediation
+data %>% 
+  ggplot(aes(x = DV_change, y = ..count.., fill = medication)) +
+  geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
+  geom_density(alpha = 0, size = 1) +
+  facet_grid(medication ~ .) + 
+  geom_vline(data = data_mean, aes(xintercept = median), linetype = 'dashed', size = 1) + 
+  geom_vline(data = data_mean, aes(xintercept = mean), size = 1) + 
+  ggtitle('original data') +
+  ylab('count') +
+  xlab('dependent variable') + 
+  theme(text = element_text(size = 15), legend.position = 'none') + 
+  scale_fill_manual(values = col_palette[c(2, 4)]) 
+
+# skewness and kurtosis
+data_shape <- data %>% 
+  group_by(medication) %>% 
+  summarise(skewness = skewness(DV_change), kurtosis = kurtosis(DV_change))
+data_shape %>% 
+  knitr::kable()
+
+# ---- NORMALITY TEST ----
+# parameters for the fitted line
+slopes <- numeric()
+ints <- numeric()
+for(i in levels(factor(data$medication))) {
+  slopes[i] <- diff(quantile(data$DV_change[data$medication == i],
+                            probs = c(0.25, 0.75))) / diff(qnorm(c(0.25, 0.75)))
+  ints[i] <- quantile(data$DV_change[data$medication == i],
+                     probs = c(0.25)) - slopes[i] * qnorm(c(0.25))
+}
+params <- data.frame(medication = levels(data$medication), 
+                     a = slopes,
+                     b = ints)
+rm(slopes, ints)
+
+# QQ-plot
+data %>% 
+  ggplot(aes(sample = DV_change, col = medication)) + 
+  geom_abline(data = params %>% group_by(medication), 
+              aes(slope = a, intercept = b), lwd = 1, lty = 2, color = 'black') +
+  geom_qq(size = 2.5) + 
+  facet_grid(. ~ medication) + 
+  scale_color_manual(values = col_palette[c(2, 4)]) 
+
+# Shapiro-Wilk test
+data %>% 
+  group_by(medication) %>% 
+  shapiro_test(DV_change)
+
 ```
 
-RS-EEG: Test for normality
-```{r first look}
-# placebo
-data_placebo <- data$DV_change[data$medication == 'placebo']
-shapiro.test(data_placebo)
-qqnorm(data_placebo)
-qqline(data_placebo)
+### Data transformation
+Transformations are applied only when needed - in the case of a non-normal distribution.
+The code below tests two possible transformations - square root and log transform with the base 2 - and their effect on the final distribution.
+```{r transformation}
+# constants --> onset to positive values
+c <- -min(data$DV_change) + 1
+data_trans <- data %>% 
+  mutate(DV_change = DV_change + c)
 
-# alprazolam
-data_alprazolam <- data$DV_change[data$medication == 'alprazolam']
-shapiro.test(data_alprazolam)
-qqnorm(data_alprazolam)
-qqline(data_alprazolam)
+# reflect if negatively skewed
+# data_trans <- data_trans %>%
+#   group_by(medication) %>%
+#   mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
+
+# ---- SQUARE ROOT ----
+# create new variable
+data_trans <- data_trans %>% 
+  mutate(DV_sqrt = sqrt(DV_change))
+
+# plot by mediation
+data_trans %>% 
+  ggplot(aes(x = DV_sqrt, y = ..count.., fill = medication)) +
+  geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
+  geom_density(alpha = 0, size = 1) +
+  facet_grid(medication ~ .) + 
+  ggtitle('square-rooted data') +
+  ylab('count') +
+  xlab('dependent variable') + 
+  theme(text = element_text(size = 15), legend.position = 'none') + 
+  scale_fill_manual(values = col_palette[c(2, 4)]) 
+
+# Shapiro-Wilk test
+data_trans %>% 
+  group_by(medication) %>% 
+  shapiro_test(DV_sqrt)
+
+# ---- LOG TRANSFORM ----
+# create new variable
+data_trans <- data_trans %>% 
+  mutate(DV_log2 = log2(DV_change))
+
+# plot by mediation
+data_trans %>% 
+  ggplot(aes(x = DV_log2, y = ..count.., fill = medication)) +
+  geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
+  geom_density(alpha = 0, size = 1) +
+  facet_grid(medication ~ .) + 
+  ggtitle('log-transformed data') +
+  ylab('count') +
+  xlab('dependent variable') + 
+  theme(text = element_text(size = 15), legend.position = 'none') + 
+  scale_fill_manual(values = col_palette[c(2, 4)]) 
+
+# Shapiro-Wilk test
+data_trans %>% 
+  group_by(medication) %>% 
+  shapiro_test(DV_log2)
 ```
 
-## RS-EEG: Statistical analysis using generalized linear mixed models
-RS-EEG: Empty model with random intercept
-```{r empty model}
-# create the model
-model_empty <- lme(
-  DV_change ~ 1,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_empty)
+### Outlier rejection
+If a serious outlier is identified, the subject might be removed from the dataset. This step is an option if transformations don't prove helpful.
+```{r outlier rejetion}
+# outlier threshold 
+out_threshold <- data %>% 
+  group_by(medication) %>% 
+  summarize(a = quantile(DV_change, 0.75) - 1.5*IQR(DV_change), b = quantile(DV_change, 0.75) + 1.5*IQR(DV_change))
+out_threshold %>% 
+  knitr::kable()
 
-# confidence intervals
-intervals(model_empty)
+# idenntify outliers
+outliers <- boxplot.stats(data %>% group_by(medication) %>% pull(DV_change))$out
+outliers_index <- which(data %>% group_by(medication) %>% pull(DV_change) %in% c(outliers))
+data[outliers_index,]
+remove_subj <- data$subject[outliers_index[c(2)]]
+
+# boxplot
+data %>% 
+  ggplot(aes(medication, DV_change, col = medication)) + 
+  geom_jitter(width = 0.2, size = 2.5, show.legend = FALSE) + 
+  scale_color_manual(values = col_palette[c(2, 4)]) + 
+  geom_boxplot(col = 'black', alpha = 0, width = 0.5) + 
+  ylab('dependent variable') +
+  xlab('medication') + 
+  theme(text = element_text(size = 15))
+
+# plot by medication
+data %>% 
+  filter(subject != remove_subj) %>% 
+  ggplot(aes(x = DV_change, y = ..count.., fill = medication)) +
+  geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
+  geom_density(alpha = 0, size = 1) +
+  facet_grid(medication ~ .) + 
+  ggtitle('data without outliers') +
+  ylab('count') +
+  xlab('dependent variable') + 
+  theme(text = element_text(size = 15), legend.position = 'none') + 
+  scale_fill_manual(values = col_palette[c(2, 4)]) 
+
+# Shapiro-Wilk test
+data %>% 
+  filter(subject != remove_subj) %>% 
+  group_by(medication) %>% 
+  shapiro_test(DV_change)
+
 ```
 
-RS-EEG: Random intercept
-```{r random intercept}
-# create the model
-model_ri <- lme(
-  DV_change ~ medication,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_ri)
+### Build models and compare
+Build progressive levels of LMM models and compare them against each other: (1) a model with a random intercept only, (2) the predictor variablle added (3), the covariate added (for TEPs), (4) random slope added.
+```{r models}
+#  ---- DATA ----
+# choose transformation if necessary
+trans <- readline(prompt = "Use transformation: ")
+if(trans == 'sqrt'){
+  data <- data %>%
+    mutate(DV_model = data_trans$DV_sqrt)
+}
+if(trans == 'log'){
+  data <- data %>%
+  mutate(DV_model = data_trans$DV_log2)
+}
+if(trans == 'none'){
+  data <- data %>%
+  mutate(DV_model = DV_change)
+}
 
-# confidence intervals
-intervals(model_ri)
-```
+# remove outliers if necessary
+out <- askYesNo('D you want to filter out ouliers?')
+if(out){
+  data <- filter(data, !subject %in% remove_subj)
+}
 
-RS-EEG: Random intercept + random slope
-```{r full model}
-# create the model
-model_rirs <- lme(
-  DV_change ~ medication,
-  random = ~ medication|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_rirs)
-
-# confidence intervals
-intervals(model_rirs)
-
-# compare all models using ANOVA
-anova(model_empty, model_ri, model_rirs)
-
-# fixed effects
-broom.mixed::tidy(model_rirs, effects = 'fixed')
-
-# fixed effects
-broom.mixed::tidy(model_rirs, effects = 'ran_pars')
-
-# residuals
-plot(model_rirs)
-qqnorm(model_rirs)
-```
-
-
-
-TEPs
-```{r import}
-
-input_file <- 'GABA_YC_medication_TEP.csv'
-data_all <- read.csv(paste(folder_dir, '\\', input_file, sep = ""))
-head(data_all, 10)
-```
-
-TEPs: Choose the outcome variable of interest 
-```{r choose data}
-# define outcome variable of interest
-# outcome_var <- 'M1_amp_P180'
-# peak_names <- c('P30', 'N45', 'P60', 'N100', 'P180')
-outcome_var <- 'AG_amp_P180'
-peak_names <- c('P25', 'N40', 'P50', 'N75', 'N100', 'P180')
-vars_keep <- c('subject', 'medication', 'rMT', outcome_var)
-
-# index the peak 
-index = 6
-
-# make into factors
-data <- as_tibble(data_all[vars_keep]) 
-data$subject <- factor(data$subject)
-data$medication <- factor(data$medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)
-
-# rename dependent variable
-data <- rename(data, TEP_change = AG_amp_P180)
-head(data, 10)
-```
-
-TEPs: Descriptive statistics 
-```{r desctiptive}
-describe <- function(x){
-  print(round(c(mean = mean(x, na.rm = TRUE),
-            median = median(x, na.rm = TRUE),
-            min = min(x, na.rm = TRUE),
-            max = max(x, na.rm = TRUE),
-            std = sd(x, na.rm = TRUE)), digits = 4))}
-
-describe(data$TEP_change)
-cat('grouped by medication: \n')
-aggregate(TEP_change ~ medication, data = data, FUN = describe)
-```
-
-TEPs: Test for normality
-```{r first look}
-# placebo
-data_placebo <- data$TEP_change[data$medication == 'placebo']
-shapiro.test(data_placebo)
-qqnorm(data_placebo)
-qqline(data_placebo)
-
-# alprazolam
-data_alprazolam <- data$TEP_change[data$medication == 'alprazolam']
-shapiro.test(data_alprazolam)
-qqnorm(data_alprazolam)
-qqline(data_alprazolam)
-```
-
-## TEPs: Statistical analysis using generalized linear mixed models
-Load packages
-```{r glmm_packages, include = FALSE, eval = TRUE}
-library(nlme)
-library(lmerTest)
-library(car)
-library(lattice)
-```
-
-Empty model with random intercept
-```{r empty}
-# create the model
-model_empty <- lme(
-  TEP_change ~ 1,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_empty)
-
-# confidence intervals
-intervals(model_empty)
-```
-
-Random intercept
-```{r ri}
-# create the model
-model_ri <- lme(
-  TEP_change ~ medication,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_ri)
-
-# confidence intervals
-intervals(model_ri)
-```
-
-Random intercept + random slope
-```{r ri + rs}
-# create the model
-model_rirs <- lme(
-  TEP_change ~ medication,
-  random = ~ medication|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_rirs)
-
-# confidence intervals
-intervals(model_rirs)
-```
-
-Full model with covariate
-```{r ri + rs + cov}
-# center the covariate
+# center the covariate (TEPs only)
 rMT_centered <- vector()
 for(i in 1:length(data$rMT)){
   if(data$medication[i] == 'placebo'){
@@ -288,32 +315,89 @@ for(i in 1:length(data$rMT)){
 } 
 data$rMT_centered <- rMT_centered
 
-# create the model
-model_rirscov <- lme(
-  TEP_change ~ medication + rMT_centered,
-  random = ~ medication|subject,
+# ---- MODELS ----
+# random intercept
+model_ri <- lme(
+  DV_model ~ 1,
+  random = ~ 1|subject,
   data = data,
   method = 'ML'
 )
-summary(model_rirscov)
+summary(model_ri)
 
-# confidence intervals
-intervals(model_rirscov, which = 'fixed')
+# add predictor
+model_rip <- lme(
+  DV_model ~ medication,
+  random = ~ 1|subject,
+  data = data,
+  method = 'ML'
+)
+summary(model_rip)
 
-# compare all models using ANOVA
-anova(model_empty, model_ri, model_rirs, model_rirscov)
+# full model
+if(data_type == 'TEP'){
+  # add covariate
+  model_ripco <- lme(
+    DV_model ~ medication + rMT_centered,
+    random = ~ 1|subject,
+    data = data,
+    method = 'ML'
+  )
+  summary(model_ripco)
+  
+  # add random slope
+  model_ripcors <- lme(
+    DV_model ~ medication + rMT_centered,
+    random = ~ medication|subject,
+    data = data,
+    method = 'ML'
+  )
+  summary(model_ripcors)
+  
+  # compare models
+  anova(model_ri, model_rip, model_ripco, model_ripcors)
+  
+} else {
+  # add random slope
+  model_riprs <- lme(
+    DV_model ~ medication,
+    random = ~ medication|subject,
+    data = data,
+    method = 'ML'
+  )
+  summary(model_riprs)
+  
+  # compare models
+  anova(model_ri, model_rip, model_riprs)
+}
 
-# fixed effects
-broom.mixed::tidy(model_rirscov, effects = 'fixed')
-
-# fixed effects
-broom.mixed::tidy(model_rirscov, effects = 'ran_pars')
-
-# residuals
-plot(model_rirscov)
-qqnorm(model_rirscov)
 ```
 
+Describe chosen model. 
+```{r final model}
+# choose the model to retain
+model <- model_ripco
+summary(model)
+  
+# confidence intervals
+intervals(model)
 
+# fixed effects
+broom.mixed::tidy(model, effects = 'fixed')
 
+# fixed effects
+broom.mixed::tidy(model, effects = 'ran_pars')
+
+# residuals
+plot(model)
+qqnorm(model)
+```
+
+### Model interpretation
+We are mostly interested in the fixed effect of medication, only controlling for 
+
+When reporting the results (using the example variable), I would formulate them as follows:
+*
+A linear mixed effects model was used to analyze   and 15 months old. Their scores were modeled with fixed effects of Month and Naps (1, 2, or 3) and random error to account for the within subjects design.There was a significant effect of Month- scores increased with age (Estimate= , SE= , p= ).
+*
 
