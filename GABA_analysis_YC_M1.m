@@ -10,24 +10,25 @@
 % datasets and saves it in structure 'GABA_YC_results'
 % 1) subject info
 % 2) RS-EEG
-% 3) TEPs
+% 3) M1 TEPs
 % 4) MEPs
 % 5) SICI
-% 6) export data for R
+% 6) AG TEPs
+% 7) export data for R
 % 
 % ----- RANOVA -----
-% 7) arousal
-% 8) rMT
-% 9) rsEEG - sigma
-% 10) rsEEG - delta
-% 11) rsEEG - AAC
-% 12) rsEEG - SE
+% 8) arousal
+% 9) rMT
+% 10) rsEEG - sigma
+% 11) rsEEG - delta
+% 12) rsEEG - AAC
+% 13) rsEEG - SE
 % 
 % ----- CORRELATIONS -----
-% 13) TEP x MEP
-% 14) TEP change x RS-EEG change
-% 15) TEP SICI x MEP SICI 
-% 16) TEP-peak SICI x MEP SICI 
+% 14) TEP x MEP
+% 15) TEP change x RS-EEG change
+% 16) TEP SICI x MEP SICI 
+% 17) TEP-peak SICI x MEP SICI 
 
 %% parameters
 clear all, clc
@@ -35,8 +36,9 @@ clear all, clc
 % ----- adjustable parameters -----
 % dataset
 group = 'YC';
-target = 'M1';
 participant = 1:20;
+peaks_M1 = {'N15' 'P30' 'N45' 'P60' 'N100' 'P180'};
+peaks_AG = {'P25' 'N40' 'P50' 'N75' 'N100' 'P180'};
 
 % visualization 
 time_window = [-0.05, 0.3];
@@ -299,7 +301,7 @@ clear a m t c spect_exp SE_i SE_change_i data_pre statement
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
 
-%% 3) TEPs
+%% 3) M1 TEPs
 % load data
 load([folder_input '\epochs.mat']);
 load([folder_input '\GABA_YC_M1_TEPs.mat'], 'GABA_TEP_peaks');
@@ -336,21 +338,21 @@ for p = 1:length(participant)
         % change
         for k = 1:6
             % define polarity
-            if mod(k, 2) == 1
-                polarity = -1;
-            else
+            if peaks_M1{k}(1) == 'P'
                 polarity = 1;
+            elseif peaks_M1{k}(1) == 'N'
+                polarity = -1;
             end
             
             % calculate change 
             GABA_YC_results.TEP_M1(m).amplitude.change(p, :, k) = (squeeze(GABA_TEP_peaks.amplitude_peak(m, 2, :, p, k))...
                 - squeeze(GABA_TEP_peaks.amplitude_peak(m, 1, :, p, k))) * polarity;
             GABA_YC_results.TEP_M1(m).latency.change(p, :, k) = (squeeze(GABA_TEP_peaks.latency(m, 2, :, p, k))...
-                - squeeze(GABA_TEP_peaks.amplitude_peak(m, 1, :, p, k)));
+                - squeeze(GABA_TEP_peaks.latency(m, 1, :, p, k)));
         end      
     end
 end
-clear p m t k statement polarity
+clear p m t k statement polarity peaks GABA_TEP_peaks
 
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
@@ -504,62 +506,96 @@ clear p m
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
 clear GABA_SICI_peaks GABA_SICI
 
-%% 6) export data for R
-% pharmacological activation of GABAARs
+%% 6) AG TEPs
+% load data
+load([folder_input '\GABA_YC_AG_TEPs.mat'], 'GABA_TEP_peaks');
+
+% fill in peak amplitude and latency
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            % peak amplitude
+            statement = ['GABA_YC_results.TEP_AG(m).amplitude.' time{t} '(p, :) = squeeze(GABA_TEP_peaks.amplitude_peak(m, t, p, :));'];
+            eval(statement)
+            
+            % peak amplitude
+            statement = ['GABA_YC_results.TEP_AG(m).latency.' time{t} '(p, :) = squeeze(GABA_TEP_peaks.latency(m, t, p, :));'];
+            eval(statement)
+        end
+        
+        % change
+        for k = 1:6
+            % define polarity
+            if peaks_AG{k}(1) == 'P'
+                polarity = 1;
+            elseif peaks_AG{k}(1) == 'N'
+                polarity = -1;
+            end
+            
+            % calculate change 
+            GABA_YC_results.TEP_AG(m).amplitude.change(p, k) = (squeeze(GABA_TEP_peaks.amplitude_peak(m, 2, p, k))...
+                - squeeze(GABA_TEP_peaks.amplitude_peak(m, 1, p, k))) * polarity;
+            GABA_YC_results.TEP_AG(m).latency.change(p, k) = (squeeze(GABA_TEP_peaks.latency(m, 2, p, k))...
+                - squeeze(GABA_TEP_peaks.latency(m, 1, p, k)));
+        end      
+    end
+end
+clear p m t k statement polarity GABA_TEP_peaks
+
+% save
+save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
+
+%% 7) export data for R
+% update 
+time_new = [time, {'change'}];
+stimulus_new = {'M1_CS' 'M1_TS' 'AG'};
+
+% ----- pharmacological activation of GABAARs: TEPs -----
 % prepare empty table
-GABA_med_long = table;
-GABA_med_long.subject = zeros(0);  GABA_med_long.medication = zeros(0); GABA_med_long.time = zeros(0); GABA_med_long.stimulus = zeros(0); 
-GABA_med_long.peak = zeros(0); GABA_med_long.TEP_amp = zeros(0); GABA_med_long.TEP_lat = zeros(0); GABA_med_long.MEP = zeros(0); 
-GABA_med_long.beta = zeros(0); GABA_med_long.AAC = zeros(0); GABA_med_long.SE = zeros(0); 
-GABA_med_long.rMT = zeros(0); 
+table_TEP = table;
 
 % cycle through entries (= rows)
 row_cnt = 1;
 for p = 1:length(participant)
     for m = 1:length(medication)
-        for t = 1:length(time)
-            for s = [1 2]
-                for c = 1:length(peaks)
+        for t = 1:length(time_new)
+            for s = 1:length(stimulus_new)
+                for k = 1:6
                     % fill corresponding line:
                     % condition info
-                    GABA_med_long.subject(row_cnt) = participant(p);             
-                    GABA_med_long.medication(row_cnt) = m - 1;
-                    GABA_med_long.time(row_cnt) = t - 1;
-                    GABA_med_long.stimulus(row_cnt) = s - 1;
-                    GABA_med_long.peak(row_cnt) = c;
-
-                    % outcome variables - TEP amplitude
-                    statement = ['GABA_med_long.TEP_amp(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(1, c);'];
-                    eval(statement)
-                    
-                    % outcome variables - TEP latency
-                    statement = ['GABA_med_long.TEP_lat(row_cnt) = GABA_results(p).TEP(m).' stimulus{s} '.' time{t} '(2, c);'];
-                    eval(statement)
-
-                    % outcome variables - MEP
-                    switch s
-                        case 1
-                            GABA_med_long.MEP(row_cnt) = 0;
-                        case 2
-                            statement = ['GABA_med_long.MEP(row_cnt) = GABA_results(p).MEP(m).TS.' time{t} '.amplitude;'];
-                            eval(statement)
+                    table_TEP.subject(row_cnt) = participant(p);             
+                    table_TEP.medication(row_cnt) = medication(m);
+                    table_TEP.time(row_cnt) = time_new(t);
+                    table_TEP.stimulus(row_cnt) = stimulus_new(s);
+                    if table_TEP.stimulus{row_cnt}(1) == 'M'
+                        table_TEP.peak(row_cnt) = peaks_M1(k);
+                    elseif table_TEP.stimulus{row_cnt}(1) == 'A'
+                        table_TEP.peak(row_cnt) = peaks_AG(k);
                     end
 
-                    % RS-EEG: beta 1 - sigma peak
-                    statement = ['GABA_med_long.beta(row_cnt) = GABA_results(p).rsEEG(m).beta.' time{t} '(1);'];
+                    % covariate - rMT
+                    statement = ['table_TEP.rMT(row_cnt) = GABA_YC_results.rmt(m).' time_new{t} '(p);'];
                     eval(statement)
                     
-                    % RS-EEG: AAC - broad alpha
-                    statement = ['GABA_med_long.AAC(row_cnt) = GABA_results(p).rsEEG(m).AAC.' time{t} '(4);'];
-                    eval(statement)
-                    
-                    % RS-EEG: SE - eyes open
-                    statement = ['GABA_med_long.SE(row_cnt) = GABA_results(p).rsEEG(m).SE.' time{t} '.open(1);'];
-                    eval(statement)
-
-                    % rMT 
-                    statement = ['GABA_med_long.rMT(row_cnt) = GABA_results(p).session(m).rmt.' time{t} ';'];
-                    eval(statement)
+                    % outcome variables 
+                    if s == 1||2
+                            % amplitude
+                            statement = ['table_TEP.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.' time_new{t} '(p, s, k);'];
+                            eval(statement)
+                            
+                            % latency
+                            statement = ['table_TEP.latency(row_cnt) = GABA_YC_results.TEP_M1(m).latency.' time_new{t} '(p, s, k);'];
+                            eval(statement)
+                            
+                    elseif s == 3
+                            % amplitude
+                            statement = ['table_TEP.amplitude(row_cnt) = GABA_YC_results.TEP_AG(m).amplitude.' time_new{t} '(p, k);'];
+                            eval(statement)
+                            
+                            % latency
+                            statement = ['table_TEP.latency(row_cnt) = GABA_YC_results.TEP_AG(m).latency.' time_new{t} '(p, k);'];
+                            eval(statement)
+                    end
 
                     % update row count
                     row_cnt = row_cnt + 1;
@@ -568,34 +604,124 @@ for p = 1:length(participant)
         end
     end
 end
-clear row_cnt p m s c statement 
+clear row_cnt p m t s k statement 
+
+% for MATLAB2016 and lower
+GABA_YC_medication_TEP = table;
+GABA_YC_medication_TEP.subject = table_TEP.subject';
+GABA_YC_medication_TEP.medication = table_TEP.medication';
+GABA_YC_medication_TEP.time = table_TEP.time';
+GABA_YC_medication_TEP.stimulus = table_TEP.stimulus';
+GABA_YC_medication_TEP.peak = table_TEP.peak';
+GABA_YC_medication_TEP.rMT = table_TEP.rMT';
+GABA_YC_medication_TEP.amplitude = table_TEP.amplitude';
+GABA_YC_medication_TEP.latency = table_TEP.latency';
+
+% % for newer MATLAB
+% GABA_YC_medication_TEP = table_TEP;
 
 % save as CSV
-writetable(GABA_med_long, 'GABA_med_long.csv', 'Delimiter', ',');
+writetable(GABA_YC_medication_TEP, 'GABA_YC_medication_TEP.csv', 'Delimiter', ',');
 
-% export epochs into .xlsx file
-TEP_epochs = table;
-row_counter = 1;
-for m = 1:length(medication)
-    for t = 1:length(time)
-        for s = 1:length(stimulus)
-            TEP_epochs.medication(row_counter) = medication(m);
-            TEP_epochs.time(row_counter) = time(t);
-            TEP_epochs.stimulus(row_counter) = stimulus(s);
-            statement = ['TEP_epochs.epochs(row_counter) = mean(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s));'];
+% ----- pharmacological activation of GABAARs: RS-EEG -----
+% prepare empty table
+table_rsEEG = table;
+
+% cycle through entries (= rows)
+row_cnt = 1;
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time_new)
+            % fill corresponding line:
+            % condition info
+            table_rsEEG.subject(row_cnt) = participant(p);             
+            table_rsEEG.medication(row_cnt) = medication(m);
+            table_rsEEG.time(row_cnt) = time_new(t);
+
+            % outcome variables - delta
+            statement = ['table_rsEEG.delta(row_cnt) = GABA_YC_results.rsEEG(m).delta.' time_new{t} '(p);'];
             eval(statement)
-            statement = ['TEP_epochs.epochs_std(row_counter) = std(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s));'];
+            
+            % outcome variables - sigma
+            statement = ['table_rsEEG.sigma(row_cnt) = GABA_YC_results.rsEEG(m).sigma.' time_new{t} '(p);'];
             eval(statement)
-            statement = ['TEP_epochs.epochs_sem(row_counter) = (std(GABA_YC_results.TEP_M1(m).epochs.' time{t} '(:, s)))/sqrt(length(participant));'];
+
+            % outcome variables - AAC
+            statement = ['table_rsEEG.AAC(row_cnt) = GABA_YC_results.rsEEG(m).AAC.' time_new{t} '(p);'];
             eval(statement)
-            row_counter = row_counter + 1;
+            
+            % outcome variables - SE
+            statement = ['table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.' time_new{t} '.closed(p, 1);'];
+            eval(statement)
+            
+            % update row count
+            row_cnt = row_cnt + 1;
         end
     end
 end
-clear m t s statement row_counter
-writetable(TEP_epochs, [folder_output '\GABA_YC_ranova.xlsx'],  'Sheet', 'M1 - TEP epochs')
+clear row_cnt p m t statement 
 
-%% 7) RANOVA: arousal
+% for MATLAB2016 and lower
+GABA_YC_medication_rsEEG = table;
+GABA_YC_medication_rsEEG.subject = table_rsEEG.subject';
+GABA_YC_medication_rsEEG.medication = table_rsEEG.medication';
+GABA_YC_medication_rsEEG.time = table_rsEEG.time';
+GABA_YC_medication_rsEEG.delta = table_rsEEG.delta';
+GABA_YC_medication_rsEEG.sigma = table_rsEEG.sigma';
+GABA_YC_medication_rsEEG.AAC = table_rsEEG.AAC';
+GABA_YC_medication_rsEEG.SE = table_rsEEG.SE';
+
+% % for newer MATLAB
+% GABA_YC_medication_rsEEG = table_rsEEG;
+
+% save as CSV
+writetable(GABA_YC_medication_rsEEG, 'GABA_YC_medication_rsEEG.csv', 'Delimiter', ',');
+
+% ----- paired-pulse activation of GABAARs: SICI -----
+% prepare empty table
+table_SICI = table;
+
+% cycle through entries (= rows)
+row_cnt = 1;
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            for k = 1:6
+                % fill corresponding line:
+                % condition info
+                table_SICI.subject(row_cnt) = participant(p);             
+                table_SICI.medication(row_cnt) = medication(m);
+                table_SICI.time(row_cnt) = time(t);
+                table_SICI.peak(row_cnt) = peaks_M1(k);
+
+                % outcome variables - amplitude 
+                statement = ['table_SICI.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.' time{t} '(p, k);'];
+                eval(statement)
+
+                % update row count
+                row_cnt = row_cnt + 1;
+            end
+        end
+    end
+end
+clear row_cnt p m t k statement 
+
+% for MATLAB2016 and lower
+GABA_YC_SICI = table;
+GABA_YC_SICI.subject = table_SICI.subject';
+GABA_YC_SICI.medication = table_SICI.medication';
+GABA_YC_SICI.time = table_SICI.time';
+GABA_YC_SICI.peak = table_SICI.peak';
+GABA_YC_SICI.SICI = table_SICI.SICI';
+
+% % for newer MATLAB
+% GABA_YC_SICI = table_SICI;
+
+% save as CSV
+writetable(GABA_YC_SICI, 'GABA_YC_SICI.csv', 'Delimiter', ',');
+clear table_TEP table_rsEEG table_SICI
+
+%% 8) RANOVA: arousal
 timepoint = {'1.5h' '2h' '2.5h'};
 
 % extract data
@@ -719,7 +845,7 @@ writematrix(data_arousal_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],..
     'Sheet', 'arousal', 'WriteMode', 'append')
 clear timepoint data_arousal data_arousal_avg data_table fig fig_name rm wd ranova_arousal
 
-%% 8) RANOVA: rMT 
+%% 9) RANOVA: rMT 
 % ----- extract data -----
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -848,7 +974,7 @@ writematrix(data_rMT_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],...
     'Sheet', 'rMT', 'WriteMode', 'append')
 clear data_rMT data_rMT_avg data_table rm wd ranova_rMT
 
-%% 9) RANOVA: rsEEG - sigma
+%% 10) RANOVA: rsEEG - sigma
 % ----- extract data -----
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -923,7 +1049,7 @@ writematrix(data_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],...
     'Sheet', 'rsEEG - sigma', 'WriteMode', 'append')
 clear data data_avg data_table rm wd ranova_data
 
-%% 10) RANOVA: rsEEG - delta
+%% 11) RANOVA: rsEEG - delta
 % ----- extract data -----
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -998,7 +1124,7 @@ writematrix(data_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],...
     'Sheet', 'rsEEG - delta', 'WriteMode', 'append')
 clear data data_avg data_table rm wd ranova_data
 
-%% 11) RANOVA: rsEEG - AAC
+%% 12) RANOVA: rsEEG - AAC
 % ----- extract data -----
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -1073,7 +1199,7 @@ writematrix(data_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],...
     'Sheet', 'rsEEG - AAC', 'WriteMode', 'append')
 clear data data_avg data_table rm wd ranova_data yl
 
-%% 12) RANOVA: rsEEG - SE
+%% 13) RANOVA: rsEEG - SE
 % ----- extract data -----
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -1272,7 +1398,7 @@ saveas(fig, [folder_figures '\' fig_name  '.png'])
 figure_counter = figure_counter + 1;
 clear varnames fig fig_name
 
-%% 14) CORRELATION: TEP change x RS-EEG change
+%% 15) CORRELATION: TEP change x RS-EEG change
 % variable names
 varnames = [peaks, {'beta' 'delta' 'AAC' 'SE'}];
 
@@ -1468,7 +1594,7 @@ end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
 
 
-%% 15) CORRELATION: TEP SICI x MEP SICI 
+%% 16) CORRELATION: TEP SICI x MEP SICI 
 % variable names
 varnames = {'TEP-SICI' 'MEP-SICI'};
 
@@ -1577,7 +1703,7 @@ for a = 1:length(row)/2
 end
 clear varnames data_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
 
-%% 15) CORRELATION: TEP SICI x MEP SICI 
+%% 17) CORRELATION: TEP SICI x MEP SICI 
 % variable names
 varnames = {'TEP-SICI P1' 'TEP-SICI N2' 'MEP-SICI'};
 
@@ -1702,7 +1828,7 @@ for a = 1:length(row)
 end
 clear varnames data_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
 
-%% 16) CORRELATION: TEP-peak SICI x MEP SICI 
+%% 18) CORRELATION: TEP-peak SICI x MEP SICI 
 % variable names
 varnames = [peaks {'MEP-SICI'}];
 
