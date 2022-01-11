@@ -1,10 +1,13 @@
 ---
 title: 'GABA-AD: Effect of pharmacological actvation of GABAARs'
-output: 
+output:
+  html_document:
+    df_print: paged
+    toc: yes
   html_notebook:
-    theme: 
+    theme:
       bootswatch: minty
-    toc: TRUE
+    toc: yes
 chunk_output_type: inline
 ---
 
@@ -13,9 +16,17 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F, comment = NA, autodep 
 ```
 
 ## **STUDY DESCRIPTION**
-### Hypothesis
+### Aim and hypothesis
+The project aims to identify specific changes in our primary outcome measures (TMS-evoked potentials, TEPs) following the administration of alprazolam, a sedative acting on GABAA receptors in the brain. 
+
+When we administer alprazolam, the strength of GABAA-mediated neurotransmission in the whole brain increases. This augmentation will lead to changes in the reaction of the brain to the TMS stimulation of primary motor cortex (M1) and Angular gyrus (AG). We can measure brain’s reaction to TMS with TEPs, and we expect to see changes in these measures that will correspond to the increased GABAA neurotransmission. The size of this effect can be then used to assess the efficiency of the system. 
+
+Observed changes in TEPs can be therefore related to the state of GABAergic neurotransmission in the brain. In the follow-up study, these changes will be used as biomarkers to assess and compare the state of GABAergic neurotransmission within patient groups.
 
 ### Experimental design
+20 subjects participated in 2 experimental sessions. Each session the same measures were taken at the baseline and after medication with either alprazolam or placebo.
+
+In addition to TEPs, which represent our target outcome variable, we also recorded resting state EEG (RS-EEG) and extracted from it 4 pre-defined features. These variables are, according to the literature, sensitive to the activation of GABAergic system. Quantification of changes in these variables serves us to (1) verify the efficiency of sedation and (2) evaluate a possible correlation with the change in TEPs. 
 
 ### Outcome variables
 - **TEP peak amplitude**: measured separately for each TEP component (5 components) and stimulus (3 M1 TEPs sub- and supra-threshold, AG TEPs)
@@ -25,7 +36,7 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F, comment = NA, autodep 
   - **Alpha Attenuation Coefficient** (eyes closed/eyes open)
   - **Spectral Exponent** of the 1/f slope
         
-All outcome variables are presented as the difference between the value post-medication and the value at baseline
+All outcome variables are measured at the baseline and after the medication (factors Time and Medication). However, since we are mainly interested in the interaction between Medication and Time, and to limit the influence of the individual amplitude of baseline TEPs, **<span style = "color: red;">the variables enter the analysis as the change introduced by the medication.</span>** The change in TEP amplitude is calculated as a simple difference between the value post-medication and the value at baseline. RS-EEG variables are expressed as a percentual chnage.
 
 ### Fixed effect
 - **MEDICATION** - binomial 
@@ -34,17 +45,15 @@ All outcome variables are presented as the difference between the value post-med
   
 - Covariate: **rMT change** - continuous value
 
-### Hierarchy in the model
-- 2 levels
-- nested within **SUBJECT**
+### Random effect
+- random intercept for each **SUBJECT**
 
 ## **STATISTICAL ANALYSIS**
-Following pipeline treats each outcome measure separately, as an independent measure
+**<span style = "color: red;">Following pipeline treats each outcome measure separately, as an independent measure.</span>**
 
-### Setup
 ```{r setup, include = FALSE, eval = TRUE}
 # report 3 significant digits
-options(digits = 3)    
+options(digits = 4)    
 
 # load packages
 library(skimr)
@@ -57,6 +66,7 @@ library(visreg)
 library(knitr)
 library(readr)
 library(nlme)
+library(lme4)
 library(car)
 
 # directories
@@ -84,21 +94,34 @@ summary(data_all)
 
 ### Variable of interest
 ```{r variable}
-# choose the variable of interest
-outcome_var <- readline(prompt = "Variable of interest: ")
-if('rMT' %in% names(data_all)){
-  data_type <- 'TEP'
-  vars2keep <- c('subject', 'medication', outcome_var, 'rMT')
-} else {
-  data_type <- 'rsEEG'
-  vars2keep <- c('subject', 'medication', outcome_var)
-}
+# variable characteristics
+target_var <- 'latency'
+target_stim <- 'AG'
+target_peak <- 'P180'
 
 # subset the dataset
-data <- data_all[vars2keep] %>% 
+data <- data_all %>% 
+  filter(time == 'change' & stimulus == target_stim & peak == target_peak) %>% 
   mutate(subject = factor(subject)) %>% 
   mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
-  rename(DV_change = as.name(outcome_var))
+  rename(DV_change = as.name(target_var)) 
+
+# transform to ms if dealing with latency
+if(target_var == 'latency'){
+  data <- data %>% 
+    mutate(DV_change = DV_change*1000)
+}
+
+# choose the variables of interest
+if('rMT' %in% names(data_all)){
+  data_type <- 'TEP'
+  vars2keep <- c('subject', 'medication', 'DV_change', 'rMT')
+} else {
+  data_type <- 'rsEEG'
+  vars2keep <- c('subject', 'medication', 'DV_change')
+}
+data <- data[vars2keep]
+
 str(data)
 ```
 
@@ -113,10 +136,10 @@ data %>%
   group_by(medication) %>% 
   skim()
 
-# calculate mean and median
+# calculate mean values
 data_mean <- data %>% 
   group_by(medication) %>% 
-  summarise(mean = mean(DV_change), median = median(DV_change))
+  summarise(mean = mean(DV_change), sd = sd(DV_change), sem = sd(DV_change)/sqrt(20), median = median(DV_change))
 data_mean %>% 
   knitr::kable()
 
@@ -179,12 +202,13 @@ The code below tests two possible transformations - square root and log transfor
 # constants --> onset to positive values
 c <- -min(data$DV_change) + 1
 data_trans <- data %>% 
+  # filter(!(subject %in% remove_subj)) %>%
   mutate(DV_change = DV_change + c)
 
 # reflect if negatively skewed
-# data_trans <- data_trans %>%
-#   group_by(medication) %>%
-#   mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
+data_trans <- data_trans %>%
+  group_by(medication) %>%
+  mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
 
 # ---- SQUARE ROOT ----
 # create new variable
@@ -233,7 +257,7 @@ data_trans %>%
 
 ### Outlier rejection
 If a serious outlier is identified, the subject might be removed from the dataset. This step is an option if transformations don't prove helpful.
-```{r outlier rejetion}
+```{r outlier identification}
 # outlier threshold 
 out_threshold <- data %>% 
   group_by(medication) %>% 
@@ -245,7 +269,6 @@ out_threshold %>%
 outliers <- boxplot.stats(data %>% group_by(medication) %>% pull(DV_change))$out
 outliers_index <- which(data %>% group_by(medication) %>% pull(DV_change) %in% c(outliers))
 data[outliers_index,]
-remove_subj <- data$subject[outliers_index[c(2)]]
 
 # boxplot
 data %>% 
@@ -256,10 +279,15 @@ data %>%
   ylab('dependent variable') +
   xlab('medication') + 
   theme(text = element_text(size = 15))
+```
+
+```{r outlier rejection}
+# choose which outliers to remove
+remove_subj <- data$subject[outliers_index[c(2)]]
 
 # plot by medication
 data %>% 
-  filter(subject != remove_subj) %>% 
+  filter(!(subject %in% remove_subj)) %>% 
   ggplot(aes(x = DV_change, y = ..count.., fill = medication)) +
   geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
   geom_density(alpha = 0, size = 1) +
@@ -272,16 +300,15 @@ data %>%
 
 # Shapiro-Wilk test
 data %>% 
-  filter(subject != remove_subj) %>% 
+  filter(!(subject %in% remove_subj)) %>% 
   group_by(medication) %>% 
   shapiro_test(DV_change)
 
 ```
 
 ### Build models and compare
-Build progressive levels of LMM models and compare them against each other: (1) a model with a random intercept only, (2) the predictor variablle added (3), the covariate added (for TEPs), (4) random slope added.
-```{r models}
-#  ---- DATA ----
+Based on the previous exploration, choose appropriate adjustment to the data.
+```{r final data}
 # choose transformation if necessary
 trans <- readline(prompt = "Use transformation: ")
 if(trans == 'sqrt'){
@@ -304,100 +331,101 @@ if(out){
 }
 
 # center the covariate (TEPs only)
-rMT_centered <- vector()
-for(i in 1:length(data$rMT)){
-  if(data$medication[i] == 'placebo'){
-    rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'placebo'])
+if(data_type == 'TEP'){
+  rMT_centered <- vector()
+  for(i in 1:length(data$rMT)){
+    if(data$medication[i] == 'placebo'){
+      rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'placebo'])
+    } 
+    if(data$medication[i] == 'alprazolam'){
+      rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'alprazolam'])
+    }
   } 
-  if(data$medication[i] == 'alprazolam'){
-    rMT_centered[i] <- data$rMT[i] - mean(data$rMT[data$medication == 'alprazolam'])
-  }
-} 
-data$rMT_centered <- rMT_centered
+  data$rMT_centered <- rMT_centered
+}
+```
 
-# ---- MODELS ----
-# random intercept
-model_ri <- lme(
-  DV_model ~ 1,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
+Model n. 1: simple linear regression without random effects
+```{r  regression}
+model_lm <- lm(DV_model ~ medication,
+  data = data
+)
+summary(model_lm)
+confint(model_lm)
+```
+
+Model n. 2: empty model with random intercept
+```{r random intercept}
+model_ri <- lmer(
+  DV_model ~ 1 + (1|subject),
+  data = data
 )
 summary(model_ri)
+confint(model_ri)
+```
 
-# add predictor
-model_rip <- lme(
-  DV_model ~ medication,
-  random = ~ 1|subject,
-  data = data,
-  method = 'ML'
-)
-summary(model_rip)
-
-# full model
+Model n. 3: predictor variables + random intercept
+```{r predictors}
 if(data_type == 'TEP'){
-  # add covariate
-  model_ripco <- lme(
+  model_rip <- lmer(
+    DV_model ~ medication + rMT_centered + (1|subject),
+    data = data
+  )
+}else{
+  model_rip <- lmer(
+    DV_model ~ medication + (1|subject),
+    data = data
+  )
+}
+summary(model_rip)
+confint(model_rip)
+```
+
+```{r compare models}
+anova(model_ri, model_rip)
+```
+
+Describe the full model using the nlme package in order to extract the p-value of the predictor. 
+```{r final model}
+# choose the model to retain
+if(data_type == 'TEP'){
+  model <- lme(
     DV_model ~ medication + rMT_centered,
     random = ~ 1|subject,
     data = data,
     method = 'ML'
   )
-  summary(model_ripco)
-  
-  # add random slope
-  model_ripcors <- lme(
-    DV_model ~ medication + rMT_centered,
-    random = ~ medication|subject,
-    data = data,
-    method = 'ML'
-  )
-  summary(model_ripcors)
-  
-  # compare models
-  anova(model_ri, model_rip, model_ripco, model_ripcors)
-  
-} else {
-  # add random slope
-  model_riprs <- lme(
+}else{
+  model <- lme(
     DV_model ~ medication,
-    random = ~ medication|subject,
+    random = ~ 1|subject,
     data = data,
     method = 'ML'
   )
-  summary(model_riprs)
-  
-  # compare models
-  anova(model_ri, model_rip, model_riprs)
 }
 
-```
-
-Describe chosen model. 
-```{r final model}
-# choose the model to retain
-model <- model_ripco
-summary(model)
-  
-# confidence intervals
-intervals(model)
+# fixed effects
+broom.mixed::tidy(model, effects = 'fixed') %>% 
+  knitr::kable()
 
 # fixed effects
-broom.mixed::tidy(model, effects = 'fixed')
-
-# fixed effects
-broom.mixed::tidy(model, effects = 'ran_pars')
+broom.mixed::tidy(model, effects = 'ran_pars') %>% 
+  knitr::kable()
 
 # residuals
 plot(model)
 qqnorm(model)
 ```
 
-### Model interpretation
-We are mostly interested in the fixed effect of medication, only controlling for 
+## **MODEL INTERPRETATION & QUESTIONS**
+I am mostly interested in the fixed effect of medication. However, as the inter-subject variability is often very high in EEG derived variables, I am including it by adding the random intercept for a subject. In case of TEP variables, I also include the change of RMT as a covariate (it can acquire a different value, positive or negative, in one subject across sessions).   
 
-When reporting the results (using the example variable), I would formulate them as follows:
-*
-A linear mixed effects model was used to analyze   and 15 months old. Their scores were modeled with fixed effects of Month and Naps (1, 2, or 3) and random error to account for the within subjects design.There was a significant effect of Month- scores increased with age (Estimate= , SE= , p= ).
-*
+When reporting the results, I would therefore focus mainly on fixed effects. Using the example variable, I would formulate my interpretation as follows: 
+***A linear mixed effects model was used to evaluate the effect of medication on the change of amplitude of the TEP component N100. Random intercept was included to account for the within subjects design and the change of rMT was added as a covariate. The results show significant effect of medication (Estimate = 0.35, SE = 0.128, p = 0.018). The effect of the rMT change was not significant.***
+
+However, I am not sure how to report and explain the great significance at the intercept. Does that mean that after placebo the change in amplitude is also significant (= significantly different from 0), however it is greater after alprazolam..?
+
+And how do I report random effects, that show very small variance and confidence intervals including 0..? 
+
+I am also not sure hohw to correct the significance levels. Should I use Bonferonni correction for each group of variables, for example if I test M1 TEPs that have 6 components, should I devide alpha by 6..?
 
