@@ -37,7 +37,7 @@ clear all, clc
 % dataset
 group = 'YC';
 participant = 1:20;
-peaks_M1 = {'N15' 'P30' 'N45' 'P60' 'N100' 'P180'};
+peaks_M1 = {'N17' 'P30' 'N45' 'P60' 'N100' 'P180'};
 peaks_AG = {'P25' 'N40' 'P50' 'N75' 'N100' 'P180'};
 
 % visualization 
@@ -86,8 +86,8 @@ clear a answer
 folder_results = uigetdir(pwd, 'Choose the Results folder');
 folder_input = [folder_results '\GABA_' group '_variables'];
 folder_output = [folder_results '\GABA_' group '_statistics'];
-if ~exist([folder_results '\GABA_' group '_statistics'])
-    mkdir([folder_results '\GABA_' group '_statistics'])
+if ~exist(folder_output)
+    mkdir(folder_output)
 end
 folder_figures = [folder_results '\GABA_' group '_figures'];
 if ~exist(folder_figures)
@@ -335,24 +335,30 @@ for p = 1:length(participant)
             eval(statement)
         end
         
-        % change
-        for k = 1:6
-            % define polarity
-            if peaks_M1{k}(1) == 'P'
-                polarity = 1;
-            elseif peaks_M1{k}(1) == 'N'
-                polarity = -1;
-            end
-            
-            % calculate change 
-            GABA_YC_results.TEP_M1(m).amplitude.change(p, :, k) = (squeeze(GABA_TEP_peaks.amplitude_peak(m, 2, :, p, k))...
-                - squeeze(GABA_TEP_peaks.amplitude_peak(m, 1, :, p, k))) * polarity;
-            GABA_YC_results.TEP_M1(m).latency.change(p, :, k) = (squeeze(GABA_TEP_peaks.latency(m, 2, :, p, k))...
-                - squeeze(GABA_TEP_peaks.latency(m, 1, :, p, k)));
-        end      
+        % calculate change 
+        for s = 1:length(stimulus)
+            for k = 1:length(peaks_M1)
+                % define polarity
+                if peaks_M1{k}(1) == 'P'
+                    polarity = 1;
+                elseif peaks_M1{k}(1) == 'N'
+                    polarity = -1;
+                end
+
+                % change in amplitude in ?V
+                amp_pre = GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k);
+                amp_post = GABA_YC_results.TEP_M1(m).amplitude.post(p, s, k);
+                GABA_YC_results.TEP_M1(m).amplitude.change(p, s, k) = (amp_post - amp_pre) * polarity;
+                               
+                % change in latency in ms
+                lat_pre = GABA_YC_results.TEP_M1(m).latency.pre(p, s, k);
+                lat_post = GABA_YC_results.TEP_M1(m).latency.post(p, s, k);
+                GABA_YC_results.TEP_M1(m).latency.change(p, s, k) = (lat_post - lat_pre);
+            end   
+        end
     end
 end
-clear p m t k statement polarity peaks GABA_TEP_peaks
+clear p m t s k statement polarity GABA_TEP_peaks amp_pre amp_post lat_pre lat_post
 
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
@@ -523,24 +529,28 @@ for p = 1:length(participant)
             eval(statement)
         end
         
-        % change
-        for k = 1:6
+         % calculate change 
+        for k = 1:length(peaks_AG)
             % define polarity
             if peaks_AG{k}(1) == 'P'
                 polarity = 1;
             elseif peaks_AG{k}(1) == 'N'
                 polarity = -1;
             end
-            
-            % calculate change 
-            GABA_YC_results.TEP_AG(m).amplitude.change(p, k) = (squeeze(GABA_TEP_peaks.amplitude_peak(m, 2, p, k))...
-                - squeeze(GABA_TEP_peaks.amplitude_peak(m, 1, p, k))) * polarity;
-            GABA_YC_results.TEP_AG(m).latency.change(p, k) = (squeeze(GABA_TEP_peaks.latency(m, 2, p, k))...
-                - squeeze(GABA_TEP_peaks.latency(m, 1, p, k)));
-        end      
+
+            % change in amplitude in ?V
+            amp_pre = GABA_YC_results.TEP_AG(m).amplitude.pre(p, k);
+            amp_post = GABA_YC_results.TEP_AG(m).amplitude.post(p, k);
+            GABA_YC_results.TEP_AG(m).amplitude.change(p, k) = (amp_post - amp_pre) * polarity;
+
+            % change in latency in ms
+            lat_pre = GABA_YC_results.TEP_AG(m).latency.pre(p, k);
+            lat_post = GABA_YC_results.TEP_AG(m).latency.post(p, k);
+            GABA_YC_results.TEP_AG(m).latency.change(p, k) = (lat_post - lat_pre); 
+        end    
     end
 end
-clear p m t k statement polarity GABA_TEP_peaks
+clear p m t k statement polarity GABA_TEP_peaks amp_pre amp_post lat_pre lat_post
 
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
@@ -578,7 +588,7 @@ for p = 1:length(participant)
                     eval(statement)
                     
                     % outcome variables 
-                    if s == 1||2
+                    if s == 1 || s == 2
                             % amplitude
                             statement = ['table_TEP.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.' time_new{t} '(p, s, k);'];
                             eval(statement)
@@ -606,19 +616,19 @@ for p = 1:length(participant)
 end
 clear row_cnt p m t s k statement 
 
-% for MATLAB2016 and lower
-GABA_YC_medication_TEP = table;
-GABA_YC_medication_TEP.subject = table_TEP.subject';
-GABA_YC_medication_TEP.medication = table_TEP.medication';
-GABA_YC_medication_TEP.time = table_TEP.time';
-GABA_YC_medication_TEP.stimulus = table_TEP.stimulus';
-GABA_YC_medication_TEP.peak = table_TEP.peak';
-GABA_YC_medication_TEP.rMT = table_TEP.rMT';
-GABA_YC_medication_TEP.amplitude = table_TEP.amplitude';
-GABA_YC_medication_TEP.latency = table_TEP.latency';
+% % for MATLAB2016 and lower
+% GABA_YC_medication_TEP = table;
+% GABA_YC_medication_TEP.subject = table_TEP.subject';
+% GABA_YC_medication_TEP.medication = table_TEP.medication';
+% GABA_YC_medication_TEP.time = table_TEP.time';
+% GABA_YC_medication_TEP.stimulus = table_TEP.stimulus';
+% GABA_YC_medication_TEP.peak = table_TEP.peak';
+% GABA_YC_medication_TEP.rMT = table_TEP.rMT';
+% GABA_YC_medication_TEP.amplitude = table_TEP.amplitude';
+% GABA_YC_medication_TEP.latency = table_TEP.latency';
 
-% % for newer MATLAB
-% GABA_YC_medication_TEP = table_TEP;
+% for newer MATLAB
+GABA_YC_medication_TEP = table_TEP;
 
 % save as CSV
 writetable(GABA_YC_medication_TEP, 'GABA_YC_medication_TEP.csv', 'Delimiter', ',');
@@ -661,18 +671,18 @@ for p = 1:length(participant)
 end
 clear row_cnt p m t statement 
 
-% for MATLAB2016 and lower
-GABA_YC_medication_rsEEG = table;
-GABA_YC_medication_rsEEG.subject = table_rsEEG.subject';
-GABA_YC_medication_rsEEG.medication = table_rsEEG.medication';
-GABA_YC_medication_rsEEG.time = table_rsEEG.time';
-GABA_YC_medication_rsEEG.delta = table_rsEEG.delta';
-GABA_YC_medication_rsEEG.sigma = table_rsEEG.sigma';
-GABA_YC_medication_rsEEG.AAC = table_rsEEG.AAC';
-GABA_YC_medication_rsEEG.SE = table_rsEEG.SE';
+% % for MATLAB2016 and lower
+% GABA_YC_medication_rsEEG = table;
+% GABA_YC_medication_rsEEG.subject = table_rsEEG.subject';
+% GABA_YC_medication_rsEEG.medication = table_rsEEG.medication';
+% GABA_YC_medication_rsEEG.time = table_rsEEG.time';
+% GABA_YC_medication_rsEEG.delta = table_rsEEG.delta';
+% GABA_YC_medication_rsEEG.sigma = table_rsEEG.sigma';
+% GABA_YC_medication_rsEEG.AAC = table_rsEEG.AAC';
+% GABA_YC_medication_rsEEG.SE = table_rsEEG.SE';
 
-% % for newer MATLAB
-% GABA_YC_medication_rsEEG = table_rsEEG;
+% for newer MATLAB
+GABA_YC_medication_rsEEG = table_rsEEG;
 
 % save as CSV
 writetable(GABA_YC_medication_rsEEG, 'GABA_YC_medication_rsEEG.csv', 'Delimiter', ',');
@@ -685,37 +695,40 @@ table_SICI = table;
 row_cnt = 1;
 for p = 1:length(participant)
     for m = 1:length(medication)
-        for t = 1:length(time)
+        for s = 2:3;
             for k = 1:6
                 % fill corresponding line:
                 % condition info
                 table_SICI.subject(row_cnt) = participant(p);             
                 table_SICI.medication(row_cnt) = medication(m);
-                table_SICI.time(row_cnt) = time(t);
+                table_SICI.stimulus(row_cnt) = stimulus(s);
                 table_SICI.peak(row_cnt) = peaks_M1(k);
 
-                % outcome variables - amplitude 
-                statement = ['table_SICI.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.' time{t} '(p, k);'];
-                eval(statement)
+                % outcome variables - raw amplitude 
+                table_SICI.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k);
 
+                % SICI = change
+                table_SICI.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.pre(p, k);
+                
                 % update row count
                 row_cnt = row_cnt + 1;
             end
         end
     end
 end
-clear row_cnt p m t k statement 
+clear row_cnt p m s k  
 
-% for MATLAB2016 and lower
-GABA_YC_SICI = table;
-GABA_YC_SICI.subject = table_SICI.subject';
-GABA_YC_SICI.medication = table_SICI.medication';
-GABA_YC_SICI.time = table_SICI.time';
-GABA_YC_SICI.peak = table_SICI.peak';
-GABA_YC_SICI.SICI = table_SICI.SICI';
+% % for MATLAB2016 and lower
+% GABA_YC_SICI = table;
+% GABA_YC_SICI.subject = table_SICI.subject';
+% GABA_YC_SICI.medication = table_SICI.medication';
+% GABA_YC_SICI.time = table_SICI.time';
+% GABA_YC_SICI.peak = table_SICI.peak';
+% GABA_YC_SICI.amplitude = table_SICI.amplitude';
+% GABA_YC_SICI.SICI = table_SICI.SICI';
 
-% % for newer MATLAB
-% GABA_YC_SICI = table_SICI;
+% for newer MATLAB
+GABA_YC_SICI = table_SICI;
 
 % save as CSV
 writetable(GABA_YC_SICI, 'GABA_YC_SICI.csv', 'Delimiter', ',');

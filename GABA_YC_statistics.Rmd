@@ -67,6 +67,8 @@ library(knitr)
 library(readr)
 library(nlme)
 library(lme4)
+library(lmerTest)
+library(pbkrtest)
 library(car)
 
 # directories
@@ -95,7 +97,7 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_var <- 'latency'
+target_var <- 'amplitude'
 target_stim <- 'AG'
 target_peak <- 'P180'
 
@@ -283,7 +285,7 @@ data %>%
 
 ```{r outlier rejection}
 # choose which outliers to remove
-remove_subj <- data$subject[outliers_index[c(2)]]
+remove_subj <- data$subject[outliers_index[c(1)]]
 
 # plot by medication
 data %>% 
@@ -325,7 +327,7 @@ if(trans == 'none'){
 }
 
 # remove outliers if necessary
-out <- askYesNo('D you want to filter out ouliers?')
+out <- askYesNo('Do you want to filter out ouliers?')
 if(out){
   data <- filter(data, !subject %in% remove_subj)
 }
@@ -385,6 +387,7 @@ confint(model_rip)
 anova(model_ri, model_rip)
 ```
 
+
 Describe the full model using the nlme package in order to extract the p-value of the predictor. 
 ```{r final model}
 # choose the model to retain
@@ -417,6 +420,11 @@ plot(model)
 qqnorm(model)
 ```
 
+Estimate p values using the Kenward-Roger approximation
+```{r final model}
+anova(model_rip, ddf="Kenward-Roger") %>% 
+  knitr::kable()
+```
 ## **MODEL INTERPRETATION & QUESTIONS**
 I am mostly interested in the fixed effect of medication. However, as the inter-subject variability is often very high in EEG derived variables, I am including it by adding the random intercept for a subject. In case of TEP variables, I also include the change of RMT as a covariate (it can acquire a different value, positive or negative, in one subject across sessions).   
 
