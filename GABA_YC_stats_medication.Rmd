@@ -1,5 +1,5 @@
 ---
-title: 'GABA-AD: Effect of pharmacological actvation of GABAARs'
+title: 'GABA-AD: Effect of pharmacological activation of GABAARs'
 output:
   html_document:
     df_print: paged
@@ -29,7 +29,7 @@ Observed changes in TEPs can be therefore related to the state of GABAergic neur
 In addition to TEPs, which represent our target outcome variable, we also recorded resting state EEG (RS-EEG) and extracted from it 4 pre-defined features. These variables are, according to the literature, sensitive to the activation of GABAergic system. Quantification of changes in these variables serves us to (1) verify the efficiency of sedation and (2) evaluate a possible correlation with the change in TEPs. 
 
 ### Outcome variables
-- **TEP peak amplitude**: measured separately for each TEP component (5 components) and stimulus (3 M1 TEPs sub- and supra-threshold, AG TEPs)
+- **TEP peak amplitude**: measured separately for each TEP component (5 or 6 components) and stimulus (M1 TEPs sub- and supra-threshold, AG TEPs)
 - **RS-EEG**: 4 DVs
   - mean power across the lower beta band = **sigma**
   - mean power across the delta band = **delta**
@@ -39,7 +39,7 @@ In addition to TEPs, which represent our target outcome variable, we also record
 All outcome variables are measured at the baseline and after the medication (factors Time and Medication). However, since we are mainly interested in the interaction between Medication and Time, and to limit the influence of the individual amplitude of baseline TEPs, **<span style = "color: red;">the variables enter the analysis as the change introduced by the medication.</span>** The change in TEP amplitude is calculated as a simple difference between the value post-medication and the value at baseline. RS-EEG variables are expressed as a percentual chnage.
 
 ### Fixed effect
-- **MEDICATION** - binomial 
+- **MEDICATION**  
   0. placebo = control condition
   1. amplrazolam
   
@@ -97,33 +97,45 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_var <- 'amplitude'
-target_stim <- 'AG'
-target_peak <- 'P180'
+target_var <- 'SE'
+target_stim <- ''
+target_peak <- ''
 
-# subset the dataset
-data <- data_all %>% 
-  filter(time == 'change' & stimulus == target_stim & peak == target_peak) %>% 
-  mutate(subject = factor(subject)) %>% 
-  mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
-  rename(DV_change = as.name(target_var)) 
-
-# transform to ms if dealing with latency
-if(target_var == 'latency'){
-  data <- data %>% 
-    mutate(DV_change = DV_change*1000)
-}
-
-# choose the variables of interest
+# choose the dataset
 if('rMT' %in% names(data_all)){
+  # define data type
   data_type <- 'TEP'
+  
+  # subset data
+  data <- data_all %>% 
+    filter(time == 'change' & stimulus == target_stim & peak == target_peak) %>% 
+    mutate(subject = factor(subject)) %>% 
+    mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
+    rename(DV_change = as.name(target_var)) 
+  
+  # variables of interest
   vars2keep <- c('subject', 'medication', 'DV_change', 'rMT')
+  
+  # transform to ms if dealing with latency
+  if(target_var == 'latency'){
+    data <- data %>% 
+      mutate(DV_change = DV_change*1000)
+  }
 } else {
+  # define data type
   data_type <- 'rsEEG'
+  
+  # subset data
+  data <- data_all %>% 
+    filter(time == 'change') %>% 
+    mutate(subject = factor(subject)) %>% 
+    mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
+    rename(DV_change = as.name(target_var)) 
+  
+  # variables of interest
   vars2keep <- c('subject', 'medication', 'DV_change')
 }
 data <- data[vars2keep]
-
 str(data)
 ```
 
@@ -208,9 +220,9 @@ data_trans <- data %>%
   mutate(DV_change = DV_change + c)
 
 # reflect if negatively skewed
-data_trans <- data_trans %>%
-  group_by(medication) %>%
-  mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
+# data_trans <- data_trans %>%
+#   group_by(medication) %>%
+#   mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
 
 # ---- SQUARE ROOT ----
 # create new variable
@@ -421,7 +433,7 @@ qqnorm(model)
 ```
 
 Estimate p values using the Kenward-Roger approximation
-```{r final model}
+```{r anova}
 anova(model_rip, ddf="Kenward-Roger") %>% 
   knitr::kable()
 ```

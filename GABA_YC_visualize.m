@@ -15,7 +15,7 @@ group = 'YC';
 participant = 1:20;
 medication = {'placebo' 'alprazolam'}; 
 time = {'pre' 'post'};
-stimulus = {'CS' 'TS' 'ppTMS'};
+stimulus = {'M1 - CS' 'M1 - TS' 'AG' 'M1 - ppTMS'};
 peaks_M1 = {'N17' 'P30' 'N45' 'P60' 'N100' 'P180'};
 peaks_AG = {'P25' 'N40' 'P50' 'N75' 'N100' 'P180'};
 
@@ -59,7 +59,86 @@ folder_figures = [folder_results '\GABA_' group '_figures'];
 % extracted outcome variables
 load([folder_results '\GABA_' group '_statistics\GABA_YC_results.mat'])
 
-%% 2) EFFECT OF ALPRAZOLAM - M1 TEPs
+% TEPs
+load([folder_results '\GABA_' group '_variables\GABA_' group '_M1_TEPs.mat'], 'GABA_data_mean')
+TEP_M1 = GABA_data_mean;
+disp(['M1 TEPs - datasize: ' num2str(size(TEP_M1))])
+
+load([folder_results '\GABA_' group '_variables\GABA_' group '_AG_TEPs.mat'], 'GABA_data_mean')
+TEP_AG = GABA_data_mean;
+disp(['AG TEPs - datasize: ' num2str(size(TEP_AG))])
+
+TEP_data(1, :, :, :, :) = squeeze(TEP_M1(:, :, 1, 1:30, :));
+TEP_data(2, :, :, :, :) = squeeze(TEP_M1(:, :, 2, 1:30, :));
+TEP_data(3, :, :, :, :) = squeeze(TEP_AG(:, :, 1:30, :));
+TEP_data(4, :, :, :, :) = squeeze(TEP_M1(:, :, 3, 1:30, :));
+
+clear GABA_data_mean TEP_AG TEP_M1
+
+%% ) BASELINE TEPs
+% time axis
+x = [-50:0.5:300];
+
+% plot the baseline butterfly plots for all stimuli
+for s = 1:3
+    % prepare baseline data data (placebo session)
+    data_visual = squeeze(TEP_data(s, 1, 1, :, :));
+
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
+
+    % set limits of y
+    switch s
+        case 1
+            yl = [-4.2 4.2];
+        case 2
+            yl = [-9 9];
+        case 3
+            yl = [-5 5];
+    end
+    ylim(yl)
+
+    % shade interpolated interval 
+    rectangle('Position', [-5, yl(1) + 0.02, 15, yl(2) - yl(1) - 0.02], 'FaceColor', [0.99 0.73 0.73], 'EdgeColor', 'none')
+
+    % loop through channels to plot
+    for c = 1:size(data_visual, 1)     
+        P(c) = plot(x, data_visual(c, :), 'Color', [0.65 0.65 0.65], 'LineWidth', 1.5);
+    end
+    
+    % Cz electrode
+    P(end+1) =  plot(x, data_visual(18, :), 'Color', [0 0 0], 'LineWidth', 3);
+    
+    % TMS stimulus
+    line([0, 0], yl, 'Color', [0.88 0.08 0.08], 'LineWidth', 3)
+
+    % other parameters
+    title(['baseline TEP: ' stimulus{s}])
+    xlabel('time (ms)')
+    ylabel('amplitude (\muV)')
+    set(gca, 'FontSize', 14)
+    xlim([x(1), x(end)])    
+    lgd = legend(P(end), 'Cz electrode', 'Box', 'off');
+    lgd.FontSize = 14;
+    lgd.Position = [0.225 0.05 0.4 0.3];
+    hold off
+
+    % name and save figure
+    if length(stimulus{s}) > 2
+        figure_name = ['TEP_' stimulus{s}(1:2) '_' stimulus{s}(end-1:end) '_baseline'];
+    else
+        figure_name = ['TEP_' stimulus{s}(1:2) '_baseline'];
+    end
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
+    % update figure counter
+    figure_counter = figure_counter + 1 ;
+end
+clear s data_visual fig yl c P lgd figure_name
+
+%% ) EFFECT OF ALPRAZOLAM - M1 TEPs
 % calculate group mean values
 for m = 1:length(medication)
     for s = 1:2
@@ -120,7 +199,7 @@ for s = 1:2
 end
 clear s peak_n m k fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
-%% 2) EFFECT OF ALPRAZOLAM - AG TEPs
+%% ) EFFECT OF ALPRAZOLAM - AG TEPs
 % calculate group mean values
 for m = 1:length(medication)
     for k = 1:length(peaks_AG)
