@@ -1,4 +1,4 @@
-%% GABA-AD: GROUP STATISTICS
+%% GABA-AD: EXPORT + GROUP ANALYSIS
 % Written by Dominika for GABA-AD project (2021)
 %
 % Colection of scripts to perform analysis of overall data: 
@@ -19,10 +19,6 @@
 % ----- RANOVA -----
 % 8) arousal
 % 9) rMT
-% 10) rsEEG - sigma
-% 11) rsEEG - delta
-% 12) rsEEG - AAC
-% 13) rsEEG - SE
 % 
 % ----- CORRELATIONS -----
 % 14) TEP x MEP
@@ -293,10 +289,25 @@ for p = 1:length(participant)
             % append
             statement = ['GABA_YC_results.rsEEG(m).SE.change.' condition{c} '(p, :) = SE_change_i;'];
             eval(statement)      
-        end        
+        end    
+        
+        % SE change in %
+        for c = 1:length(condition)   
+            for a = 1:3
+                % extract data
+                statement = ['SE_pre = GABA_YC_results.rsEEG(m).SE.pre.' condition{c} '(p, a);'];
+                eval(statement)
+                statement = ['SE_post = GABA_YC_results.rsEEG(m).SE.post.' condition{c} '(p, a);'];
+                eval(statement)
+
+                % calculate change and append
+                statement = ['GABA_YC_results.rsEEG(m).SE.change_percent.' condition{c} '(p, a) = SE_post/SE_pre*100 - 100;'];
+                eval(statement)     
+            end
+        end   
     end
 end
-clear a m t c spect_exp SE_i SE_change_i data_pre statement
+clear a m t c spect_exp SE_i SE_change_i data_pre statement SE_pre SE_post
 
 % save
 save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results', '-append')
@@ -661,8 +672,12 @@ for p = 1:length(participant)
             eval(statement)
             
             % outcome variables - SE
-            statement = ['table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.' time_new{t} '.closed(p, 1);'];
-            eval(statement)
+            if t == 3
+                table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.change_percent
+            else
+                statement = ['table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.' time_new{t} '.closed(p, 1);'];
+                eval(statement)
+            end
             
             % update row count
             row_cnt = row_cnt + 1;
