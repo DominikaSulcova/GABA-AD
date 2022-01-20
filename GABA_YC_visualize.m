@@ -248,6 +248,172 @@ saveas(fig, [folder_figures '\' figure_name '.png'])
 figure_counter = figure_counter + 1;
 clear fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
+%% ) BASELINE SICI
+% get data
+for m = 1:length(medication)
+    for k = 1:length(peaks_M1)
+        data_visual(k, m) = mean(GABA_YC_results.SICI(m).TEP.pre(:, k)); 
+        sem_visual(k, m) = std(GABA_YC_results.SICI(m).TEP.pre(:, k))/sqrt(length(participant));
+    end
+end
+        
+% launch the figure
+fig = figure(figure_counter);
+hold on
+barplot = bar(data_visual, 'EdgeColor', 'none');
+col = colours([2, 4], :);
+for b = 1:size(data_visual, 2)
+    barplot(b).FaceColor = col(b, :);
+end
+
+% plot errorbars
+ngroups = size(data_visual, 1);
+nbars = size(data_visual, 2);
+groupwidth = min(0.8, nbars/(nbars + 1.5));
+for i = 1:nbars
+    x_bar = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
+    errorbar(x_bar, data_visual(:, i), sem_visual(:, i), sem_visual(:, i), 'k', 'linestyle', 'none');
+end        
+
+% set other parameters
+title('SICI: change in TEP peak amplitude')
+ylabel('\Delta amplitude (\muV \pmSEM)');
+xlabel('TEP component')
+set(gca, 'xtick', 1:6, 'xticklabel', peaks_M1)
+set(gca, 'Fontsize', 14)
+legend(barplot, medication, 'Location', 'southeast', 'fontsize', 14)
+
+% name and save figure
+figure_name = 'TEP_SICI_amplitude_baseline';
+savefig([folder_figures '\' figure_name '.fig'])
+saveas(fig, [folder_figures '\' figure_name '.png'])
+
+% update figure counter, clear
+figure_counter = figure_counter + 1;
+clear m k data_visual sem_visual fig barplot col b ngroups nbars groupwidth i x_bar
+
+%% ) CORRELATION: TEP SICI x MEP SICI 
+% ----- decide output parameters -----
+peaks_SICI = {'N17' 'P60' 'N100'};
+% ------------------------------------
+% variable names
+varnames = [peaks_SICI, {'MEP-SICI'}];
+
+% extract TEP data
+for m = 1:length(medication)
+    for p = 1:length(participant)               
+        data_cor((m-1)*length(participant) + p, :) = GABA_YC_results.SICI(m).TEP.pre(p, contains(peaks_M1, peaks_SICI));
+    end
+end
+
+% extract MEP data
+for m = 1:length(medication)
+    for p = 1:length(participant)               
+        data_cor((m-1)*length(participant) + p, length(peaks_SICI) + 1) = GABA_YC_results.SICI(m).MEP.pre(p);
+    end
+end
+
+% Bonferroni correction of alpha
+alpha_cor = alpha/length(peaks_SICI);
+
+% ----- significant linear correlation -----
+% identify significant cases        
+[cor_coef, cor_p] = corrcoef(data_cor);
+[row, col] = find(cor_p < alpha_cor);
+
+% plot significant cases
+for a = 1:length(row)    
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+
+    % choose only correlations that show TEP-MEP interactions
+    if ismember(row(a), 1:length(peaks_SICI)) && col(a) == length(peaks_SICI) + 1            
+        % plot data + regression line
+        fig = figure(figure_counter);
+        hold on
+        plot_cor = plotAdded(data_model);
+
+        % adjust parameters    
+        title(sprintf('Linear correlation - baseline:\n%s ~ %s', varnames{col(a)}, varnames{row(a)}))
+        xlabel(['change in ' varnames{row(a)}]); ylabel(varnames{col(a)});
+        set(gca, 'FontSize', 14)
+        plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+        plot_cor(1).MarkerEdgeColor = colours(2, :); plot_cor(1).MarkerFaceColor = colours(2, :);
+        plot_cor(2).Color = colours(3, :); plot_cor(2).LineWidth = 2; 
+        plot_cor(3).Color = colours(3, :); plot_cor(3).LineWidth = 2;
+        legend off
+        if data_model.Coefficients.Estimate(2) > 0
+            text_pos = [0.95 0.85 0.75];
+        else
+            text_pos = [0.25 0.15 0.05];
+        end
+        T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+        T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+        T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+        set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+        set(T(2), 'fontsize', 14); 
+        set(T(3), 'fontsize', 14, 'color', colours(3, :)); 
+
+        % save figure and continue
+        fig_name = ['corr_TEP-SICIxMEP-SICI_linear_' varnames{row(a)} '_' varnames{col(a)}];
+        savefig([folder_figures '\' fig_name '.fig'])
+        saveas(fig, [folder_figures '\' fig_name  '.png'])  
+        figure_counter = figure_counter + 1;
+    end
+end
+% ----- significant ranked correlation -----  
+
+% identify significant cases        
+[cor_coef, cor_p] = corr(data_cor, 'Type', 'Spearman');
+[row, col] = find(cor_p < alpha_cor);
+
+% rank the data
+for a = 1:size(data_cor, 2)
+    [temp, data_cor(:, a)]  = ismember(data_cor(:, a), unique(data_cor(:, a)));
+end
+
+% plot significant cases
+for a = 1:length(row)    
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
+
+    % choose only correlations that show TEP-MEP interactions
+    if ismember(row(a), 1:length(peaks_SICI)) && col(a) == length(peaks_SICI) + 1              
+        % plot data + regression line
+        fig = figure(figure_counter);
+        hold on
+        plot_cor = plotAdded(data_model);
+
+        % adjust parameters    
+        title(sprintf('Spearman rank correlation - baseline:\n%s ~ %s', varnames{col(a)}, varnames{row(a)}))
+        xlabel(['change in ' varnames{row(a)}]); ylabel(varnames{col(a)});
+        set(gca, 'FontSize', 14)
+        plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+        plot_cor(1).MarkerEdgeColor = colours(2, :); plot_cor(1).MarkerFaceColor = colours(2, :);
+        plot_cor(2).Color = colours(3, :); plot_cor(2).LineWidth = 2; 
+        plot_cor(3).Color = colours(3, :); plot_cor(3).LineWidth = 2;
+        legend off
+        if data_model.Coefficients.Estimate(2) > 0
+            text_pos = [0.95 0.85 0.75];
+        else
+            text_pos = [0.25 0.15 0.05];
+        end
+        T(1) = text(0.05, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+        T(2) = text(0.05, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+        T(3) = text(0.05, text_pos(3), sprintf('r = %1.3f, p = %1.5f', cor_coef(row(a), col(a)), cor_p(row(a), col(a))), 'Units', 'Normalized');
+        set(T(1), 'fontsize', 14, 'fontweight', 'bold', 'fontangle', 'italic'); 
+        set(T(2), 'fontsize', 14); 
+        set(T(3), 'fontsize', 14, 'color', colours(3, :)); 
+
+        % save figure and continue
+        fig_name = ['corr_TEP-SICIxMEP-SICI_ranked_' varnames{row(a)} '_' varnames{col(a)}];
+        savefig([folder_figures '\' fig_name '.fig'])
+        saveas(fig, [folder_figures '\' fig_name  '.png'])  
+        figure_counter = figure_counter + 1;
+    end
+end
+clear peaks_SICI varnames m p data_cor alpha_cor cor_coef cor_p row col data_model fig plot_cor fig_name T text_pos a temp 
+
 %% ***
 % M1: hostogram - peak amplitude
 fig = figure(figure_counter);
