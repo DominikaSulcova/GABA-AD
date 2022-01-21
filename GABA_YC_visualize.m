@@ -248,170 +248,115 @@ saveas(fig, [folder_figures '\' figure_name '.png'])
 figure_counter = figure_counter + 1;
 clear fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
-%% ***
-% M1: hostogram - peak amplitude
-fig = figure(figure_counter);
-for p = 1:length(peaks_M1)
-    for m = 1:length(medication)        
-        % launch the plot
-        subplot(length(medication), length(peaks_M1), (m-1)*length(peaks_M1) + p)
-        hold on
+%% ) SICI: EXPONENTIAL REGRESSION
+peaks_SICI = {'N17' 'P60' 'N100'};
+
+% get the data
+for m = 1:length(medication)
+    for p = 1:length(participant)    
+        % TEP SICI = x 
+        x_corr(:, (m-1)*length(participant) + p) = GABA_YC_results.SICI(m).TEP.pre(p, contains(peaks_M1, peaks_SICI))';
         
-        % plot the histogram with a normal distribution fit
-        h = histfit(data_M1(:, m, p, 1), 10, 'kernel');
-        h(1).FaceColor = colours((m-1)*2 + 1, :); h(1).EdgeColor = [1 1 1];
-        h(2).Color = [0 0 0]; h(2).LineWidth = 1;
+        % MEP SICI = y
+        y_corr((m-1)*length(participant) + p) = 100 - GABA_YC_results.SICI(m).MEP.pre(p);
         
-        % get limits
-        yl = get(gca, 'ylim'); xl = get(gca, 'xlim');
-        
-        % add mean of the distribution
-        mu = mean(data_M1(:, m, p, 1));
-        text(xl(1), yl(2)*-0.1, sprintf('mu = %1.3f', mu), 'FontSize', 10, 'FontWeight', 'bold')
-        
-        % add skewness and kurtosis
-        s = skewness(data_M1(:, m, p, 1)); k = kurtosis(data_M1(:, m, p, 1));
-        text(xl(1), yl(2)*-0.2, sprintf('%1.3f, %1.3f', s, k), 'FontSize', 10)
-            
-        % set annotation
-        if p == 1
-            text(xl(1) - (xl(2) - xl(1)), yl(2)*0.7, medication{m}, 'FontSize', 10)
-            clear yl xl
-        end
-                       
-        % set title
-        if m == 1
-            title(peaks_M1{p})
-        end
+        % choose colours
+        marker_col((m-1)*length(participant) + p, :) = colours((m-1)*2 + 2, :);
     end
-end   
-clear p m h yl xl mu s k
+end
+clear m p
 
-% parameters
-fig.Position = [500 400 750 500];
-sgtitle('M1 - change in peak amplitude')
-
-% update counter
-figure_counter = figure_counter + 1;
-
-% M1: QQ plot - peak amplitude
-fig = figure(figure_counter);
-for p = 1:length(peaks_M1)
-    for m = 1:length(medication)        
-        % launch the plot
-        subplot(length(medication), length(peaks_M1), (m-1)*length(peaks_M1) + p)
-        hold on
-        
-        % plot the histogram with a normal distribution fit
-        q = qqplot(data_M1(:, m, p, 1));
-        title(''); xlabel(''); ylabel('')
-        
-        % get limits
-        yl = get(gca, 'ylim'); xl = get(gca, 'xlim');
-      
-        % set annotation
-        if p == 1
-            text(xl(1) - (xl(2) - xl(1))*0.7, yl(2)*0.7, medication{m}, 'FontSize', 10)
-            clear yl xl
-        end
-                       
-        % set title
-        if m == 1
-            title(peaks_M1{p})
-        end
+% calculate and plot for each component of interest
+for p = 1:length(peaks_SICI)
+    % choose x and y
+    data_corr(:, 1) = x_corr(p, :)'*-1;
+    data_corr(:, 2) = y_corr';
+    
+    % rank the data
+    for a = 1:size(data_corr, 2)
+        [temp, data_corr_ranked(:, a)]  = ismember(data_corr(:, a), unique(data_corr(:, a)));
     end
-end   
-clear p m q yl xl
+    clear a temp
+    
+    % prepare linear model: y ~ 1 + x
+    data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNames', {[peaks_SICI{p} ' SICI'] 'MEP SICI'});
 
-% parameters
-fig.Position = [200 400 1000 500];
-sgtitle('M1 - change in peak amplitude')
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
 
-% update counter
-figure_counter = figure_counter + 1;
+    % save the figure   
+    figure_name = ['corr_SICI_MEPx' peaks_SICI{p}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+    
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+clear x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked fig figure_name
 
-% AG: histogram - peak amplitude
-fig = figure(figure_counter);
-for p = 1:length(peaks_AG)
-    for m = 1:length(medication)        
-        % launch the plot
-        subplot(length(medication), length(peaks_AG), (m-1)*length(peaks_AG) + p)
-        hold on
-        
-        % plot the histogram with a normal distribution fit
-        h = histfit(data_AG(:, m, p, 1), 10, 'kernel');
-        h(1).FaceColor = colours((m-1)*2 + 1, :); h(1).EdgeColor = [1 1 1];
-        h(2).Color = [0 0 0]; h(2).LineWidth = 1;
-        
-        % get limits
-        yl = get(gca, 'ylim'); xl = get(gca, 'xlim');
-        
-        % add mean of the distribution
-        mu = mean(data_AG(:, m, p, 1));
-        text(xl(1), yl(2)*-0.1, sprintf('mu = %1.3f', mu), 'FontSize', 10, 'FontWeight', 'bold')
-        
-        % add skewness and kurtosis
-        s = skewness(data_AG(:, m, p, 1)); k = kurtosis(data_AG(:, m, p, 1));
-        text(xl(1), yl(2)*-0.2, sprintf('%1.3f, %1.3f', s, k), 'FontSize', 10)
-            
-        % set annotation
-        if p == 1
-            text(xl(1) - (xl(2) - xl(1)), yl(2)*0.7, medication{m}, 'FontSize', 10)
-            clear yl xl
-        end
-                       
-        % set title
-        if m == 1
-            title(peaks_AG{p})
-        end
-    end
-end   
-clear p m h yl xl mu s k
+%%
+for p = 1:length(peaks_SICI)
+        % fit
+    [curvefit,gof,output] = fit(x, y, 'exp1');
+    
+    % plot
+    figure(figure_counter)
+    subplot(2, 2, 1)
+    plot(curvefit,x,y)
+    
+    subplot(2, 2, 2)
+    scatter(x,log(y))  
+    
+    subplot(2, 2, 3)
+    plot(curvefit,x,y,'Residuals')
+    
+    subplot(2, 2, 4)
+    plot(curvefit,x,y,'predfunc')
+    
+    % compute coefficients
+    n = length(x);
+    y2 = log(y);
+    j = sum(x);
+    k = sum(y2);
+    r2 = sum(x .* y2);
+    m = sum(y2.^2);
+    c = f.b * (r2 - j * k / n);
+    d = m - k^2 / n;
+    corr = sqrt(c/d);
+    std_err = sqrt((d - c) / (n - 2)); 
+    
+end
+clear x_corr y_corr marker_col p x y curvefit n y2 r2 j k m c d corr std_err gof output
 
-% parameters
-fig.Position = [500 400 750 500];
-sgtitle('AG - change in peak amplitude')
+%% FUNCTIONS
+function plot_corr(data_model, data_corr, marker_col, corr_type)
+% plot correlation
+plot_cor = plotAdded(data_model);
 
-% update counter
-figure_counter = figure_counter + 1;
+% adjust parameters    
+set(gca, 'FontSize', 20)
+xlabel(data_model.VariableNames{1}); 
+ylabel(data_model.VariableNames{2});
+plot_cor(2).Color = [0 0 0]; plot_cor(2).LineWidth = 4; 
+plot_cor(3).Color = [0 0 0]; plot_cor(3).LineWidth = 2;
+legend off
+title('')
 
-% AG: QQ plot - peak amplitude
-fig = figure(figure_counter);
-for p = 1:length(peaks_AG)
-    for m = 1:length(medication)        
-        % launch the plot
-        subplot(length(medication), length(peaks_AG), (m-1)*length(peaks_AG) + p)
-        hold on
-        
-        % plot the histogram with a normal distribution fit
-        q = qqplot(data_AG(:, m, p, 1));
-        title(''); xlabel(''); ylabel('')
-        
-        % get limits
-        yl = get(gca, 'ylim'); xl = get(gca, 'xlim');
-      
-        % set annotation
-        if p == 1
-            text(xl(1) - (xl(2) - xl(1))*0.7, yl(2)*0.7, medication{m}, 'FontSize', 10)
-            clear yl xl
-        end
-                       
-        % set title
-        if m == 1
-            title(peaks_AG{p})
-        end
-    end
-end   
-clear p m q yl xl 
+% replot markers
+for c = 1:size(data_corr, 1)
+    scatter(data_corr(c, 1), data_corr(c, 2), 90, marker_col(c, :), 'filled');
+    hold on
+end
 
-% parameters
-fig.Position = [200 400 1000 500];
-sgtitle('AG - change in peak amplitude')
-
-% update counter
-figure_counter = figure_counter + 1;
-clear fig
-
-
+% add annotations
+text_pos = [0.90 0.78];
+rectangle('Position', [2, 27, 18, 12], 'FaceColor',[1 1 1], 'EdgeColor', [0.5 0.5 0.5])
+T(1) = text(0.1, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+T(2) = text(0.1, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Adjusted), 'Units', 'Normalized');
+set(T(1), 'fontsize', 20, 'fontangle', 'italic', 'fontweight', 'bold'); 
+set(T(2), 'fontsize', 20); 
+end
 
 
