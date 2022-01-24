@@ -59,7 +59,7 @@ folder_figures = [folder_results '\GABA_' group '_figures'];
 % extracted outcome variables
 load([folder_results '\GABA_' group '_statistics\GABA_YC_results.mat'])
 
-% TEPs
+% average TEPs
 load([folder_results '\GABA_' group '_variables\GABA_' group '_M1_TEPs.mat'], 'GABA_data_mean')
 TEP_M1 = GABA_data_mean;
 disp(['M1 TEPs - datasize: ' num2str(size(TEP_M1))])
@@ -68,12 +68,14 @@ load([folder_results '\GABA_' group '_variables\GABA_' group '_AG_TEPs.mat'], 'G
 TEP_AG = GABA_data_mean;
 disp(['AG TEPs - datasize: ' num2str(size(TEP_AG))])
 
-TEP_data(1, :, :, :, :) = squeeze(TEP_M1(:, :, 1, 1:30, :));
-TEP_data(2, :, :, :, :) = squeeze(TEP_M1(:, :, 2, 1:30, :));
-TEP_data(3, :, :, :, :) = squeeze(TEP_AG(:, :, 1:30, :));
-TEP_data(4, :, :, :, :) = squeeze(TEP_M1(:, :, 3, 1:30, :));
-
+TEP_mean(1, :, :, :, :) = squeeze(TEP_M1(:, :, 1, 1:30, :));
+TEP_mean(2, :, :, :, :) = squeeze(TEP_M1(:, :, 2, 1:30, :));
+TEP_mean(3, :, :, :, :) = squeeze(TEP_AG(:, :, 1:30, :));
+TEP_mean(4, :, :, :, :) = squeeze(TEP_M1(:, :, 3, 1:30, :));
 clear GABA_data_mean TEP_AG TEP_M1
+
+% SICI
+load([folder_results '\GABA_' group '_variables\GABA_' group '_M1_TEPs.mat'], 'GABA_SICI')
 
 %% ) BASELINE TEPs
 % time axis
@@ -82,7 +84,7 @@ x = [-50:0.5:300];
 % plot the baseline butterfly plots for all stimuli
 for s = 1:3
     % prepare baseline data data (placebo session)
-    data_visual = squeeze(TEP_data(s, 1, 1, :, :));
+    data_visual = squeeze(TEP_mean(s, 1, 1, :, :));
 
     % launch the figure
     fig = figure(figure_counter);
@@ -200,6 +202,7 @@ end
 clear s peak_n m k fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
 %% ) EFFECT OF ALPRAZOLAM - AG TEPs
+peaks_SICI = {'N17' 'P60' 'N100'}; 
 % calculate group mean values
 for m = 1:length(medication)
     for k = 1:length(peaks_AG)
@@ -248,45 +251,54 @@ saveas(fig, [folder_figures '\' figure_name '.png'])
 figure_counter = figure_counter + 1;
 clear fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
-%% ***
-% M1: hostogram - peak amplitude
-fig = figure(figure_counter);
-for p = 1:length(peaks_M1)
-    for m = 1:length(medication)        
-        % launch the plot
-        subplot(length(medication), length(peaks_M1), (m-1)*length(peaks_M1) + p)
-        hold on
-        
-        % plot the histogram with a normal distribution fit
-        h = histfit(data_M1(:, m, p, 1), 10, 'kernel');
-        h(1).FaceColor = colours((m-1)*2 + 1, :); h(1).EdgeColor = [1 1 1];
-        h(2).Color = [0 0 0]; h(2).LineWidth = 1;
-        
-        % get limits
-        yl = get(gca, 'ylim'); xl = get(gca, 'xlim');
-        
-        % add mean of the distribution
-        mu = mean(data_M1(:, m, p, 1));
-        text(xl(1), yl(2)*-0.1, sprintf('mu = %1.3f', mu), 'FontSize', 10, 'FontWeight', 'bold')
-        
-        % add skewness and kurtosis
-        s = skewness(data_M1(:, m, p, 1)); k = kurtosis(data_M1(:, m, p, 1));
-        text(xl(1), yl(2)*-0.2, sprintf('%1.3f, %1.3f', s, k), 'FontSize', 10)
-            
-        % set annotation
-        if p == 1
-            text(xl(1) - (xl(2) - xl(1)), yl(2)*0.7, medication{m}, 'FontSize', 10)
-            clear yl xl
-        end
-                       
-        % set title
-        if m == 1
-            title(peaks_M1{p})
-        end
-    end
-end   
-clear p m h yl xl mu s k
+%% ) BASELINE SICI - AMPLITUDE CHANGE
+% get data 
+for m = 1:length(medication) 
+    for k = 1:length(peaks_M1) 
+        data_visual(k, m) = mean(GABA_YC_results.SICI(m).TEP.pre(:, k));  
+        sem_visual(k, m) = std(GABA_YC_results.SICI(m).TEP.pre(:, k))/sqrt(length(participant)); 
+    end 
+end 
+         
+% launch the figure 
+fig = figure(figure_counter); 
+hold on 
+barplot = bar(data_visual, 'EdgeColor', 'none'); 
+col = colours([2, 4], :); 
+for b = 1:size(data_visual, 2) 
+    barplot(b).FaceColor = col(b, :); 
+end 
+ 
+% plot errorbars 
+ngroups = size(data_visual, 1); 
+nbars = size(data_visual, 2); 
+groupwidth = min(0.8, nbars/(nbars + 1.5)); 
+for i = 1:nbars 
+    x_bar = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars); 
+    errorbar(x_bar, data_visual(:, i), sem_visual(:, i), sem_visual(:, i), 'k', 'linestyle', 'none'); 
+end         
+ 
+% set other parameters 
+title('SICI: change in TEP peak amplitude') 
+ylabel('\Delta amplitude (\muV \pmSEM)'); 
+xlabel('TEP component') 
+set(gca, 'xtick', 1:6, 'xticklabel', peaks_M1) 
+set(gca, 'Fontsize', 14) 
+legend(barplot, medication, 'Location', 'southeast', 'fontsize', 14) 
+ 
+% name and save figure 
+figure_name = 'TEP_SICI_amplitude_baseline'; 
+savefig([folder_figures '\' figure_name '.fig']) 
+saveas(fig, [folder_figures '\' figure_name '.png']) 
+ 
+% update figure counter, clear 
+figure_counter = figure_counter + 1; 
+clear m k data_visual sem_visual fig barplot col b ngroups nbars groupwidth i x_bar 
 
+%% ) BASELINE SICI - TEP-MEP CORRELATION
+% ----- decide output parameters -----
+peaks_SICI = {'N17' 'P60' 'N100'}; 
+% ------------------------------------
 % get the data
 for m = 1:length(medication)
     for p = 1:length(participant)    
@@ -332,7 +344,6 @@ for p = 1:length(peaks_SICI)
 end
 clear x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked fig figure_name
 
-%%
 for p = 1:length(peaks_SICI)
         % fit
     [curvefit,gof,output] = fit(x, y, 'exp1');
@@ -365,6 +376,71 @@ for p = 1:length(peaks_SICI)
     
 end
 clear x_corr y_corr marker_col p x y curvefit n y2 r2 j k m c d corr std_err gof output
+
+%% ) BASELINE SICI - SUBTRACTION
+% ----- decide output parameters -----
+electrode = {'C3'}; 
+% ------------------------------------
+% load default labels
+load([folder_git '\GABA_header_default.mat'])
+labels = {header.chanlocs.labels};
+clear header
+
+% time axis
+x = [-50:0.5:300];
+
+% plot SICI for each chosen electrode
+for e = 1:length(electrode)
+    % prepare baseline data data at C3 (placebo session)
+    e_n = find(strcmp(labels, electrode{e}));
+    data_visual = squeeze(GABA_SICI.mean(1, 1, e_n, :))';
+    CI_visual = squeeze(GABA_SICI.CI(1, 1, e_n, :))';
+
+    % launch the figure
+    fig = figure(figure_counter);
+    hold on
+
+    % set limits of the figure
+    plot(x, data_visual + CI_visual, 'b:', 'LineWidth', 0.5)
+    plot(x, data_visual - CI_visual, 'b:', 'LineWidth', 0.5)
+    yl = get(gca, 'ylim'); yl(1) = yl(1) - 0.2; yl(2) = yl(2) + 0.3;
+    cla, hold on
+    
+    % shade interpolated interval 
+    rectangle('Position', [-5, yl(1) + 0.02, 15, yl(2) - yl(1) - 0.02], 'FaceColor', [0.99 0.73 0.73], 'EdgeColor', 'none')
+
+    % plot data       
+    P = plot(x, data_visual, 'Color', [0 0 0], 'LineWidth', 3);
+    F = fill([x fliplr(x)],[data_visual + CI_visual fliplr(data_visual - CI_visual)], ...
+        [0 0 0], 'FaceAlpha', 0.25, 'linestyle', 'none');
+
+    % mark TMS stimulus and zero line
+    line([0, 0], yl, 'Color', [0.88 0.08 0.08], 'LineWidth', 2)
+    line(x, zeros(1, length(x)), 'Color', [0.88 0.08 0.08], 'LineWidth', 2, 'LineStyle', ':')
+    
+    % add other parameters
+    xlabel('time (ms)')
+    ylabel('amplitude (\muV)')
+    set(gca, 'FontSize', 14)
+    xlim([x(1), x(end)])
+    ylim(yl)
+    
+    % add legend
+    lgd = legend(P, [electrode{e} ' electrode'], 'Box', 'off');
+    lgd.FontSize = 14;
+    lgd.Position = [0.55 0.05 0.4 0.3];
+    hold off
+    
+    % save figure
+    figure_name = ['TEP_SICI_' electrode{e} '_baseline'];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+end
+
+% update figure counter
+figure_counter = figure_counter + 1 ;
+
+clear electrode e e_n x data_visual CI_visual fig yl P F lgd figure_name 
 
 %% FUNCTIONS
 function plot_corr(data_model, data_corr, marker_col, corr_type)
