@@ -644,6 +644,42 @@ GABA_YC_medication_TEP = table_TEP;
 % save as CSV
 writetable(GABA_YC_medication_TEP, 'GABA_YC_medication_TEP.csv', 'Delimiter', ',');
 
+% ----- pharmacological activation of GABAARs: MEPs -----
+% prepare empty table
+table_MEP = table;
+
+% cycle through entries (= rows)
+row_cnt = 1;
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time_new)
+            % fill corresponding line:
+            % condition info
+            table_MEP.subject(row_cnt) = participant(p);             
+            table_MEP.medication(row_cnt) = medication(m);
+            table_MEP.time(row_cnt) = time_new(t);
+
+            % covariate - rMT
+            statement = ['table_MEP.rMT(row_cnt) = GABA_YC_results.rmt(m).' time_new{t} '(p);'];
+            eval(statement)
+
+            % outcome variable - amplitude
+            statement = ['table_MEP.amplitude(row_cnt) = GABA_YC_results.MEP(m).amplitude.' time_new{t} '(p, 1);'];
+            eval(statement)
+
+            % update row count
+            row_cnt = row_cnt + 1;
+        end
+    end
+end
+clear row_cnt p m t s k statement 
+
+% for newer MATLAB
+GABA_YC_medication_MEP = table_MEP;
+
+% save as CSV
+writetable(GABA_YC_medication_MEP, 'GABA_YC_medication_MEP.csv', 'Delimiter', ',');
+
 % ----- pharmacological activation of GABAARs: RS-EEG -----
 % prepare empty table
 table_rsEEG = table;

@@ -97,7 +97,7 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_var <- 'SE'
+target_var <- 'amplitude'
 target_stim <- ''
 target_peak <- ''
 
@@ -106,13 +106,6 @@ if('rMT' %in% names(data_all)){
   # define data type
   data_type <- 'TEP'
   
-  # subset data
-  data <- data_all %>% 
-    filter(time == 'change' & stimulus == target_stim & peak == target_peak) %>% 
-    mutate(subject = factor(subject)) %>% 
-    mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
-    rename(DV_change = as.name(target_var)) 
-  
   # variables of interest
   vars2keep <- c('subject', 'medication', 'DV_change', 'rMT')
   
@@ -120,6 +113,21 @@ if('rMT' %in% names(data_all)){
   if(target_var == 'latency'){
     data <- data %>% 
       mutate(DV_change = DV_change*1000)
+  }
+  
+  # subset data - distinguish between MEP and TEP
+  if(length(target_stim)>1){
+    data <- data_all %>% 
+      filter(time == 'change' & stimulus == target_stim & peak == target_peak) %>% 
+      mutate(subject = factor(subject)) %>% 
+      mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
+      rename(DV_change = as.name(target_var))
+  }else{
+    data <- data_all %>% 
+      filter(time == 'change') %>% 
+      mutate(subject = factor(subject)) %>% 
+      mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
+      rename(DV_change = as.name(target_var))
   }
 } else {
   # define data type

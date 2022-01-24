@@ -155,6 +155,13 @@ for m = 1:length(medication)
     end
 end
 
+%% calculte mean values
+data = GABA_YC_results.MEP(2).amplitude.post(:, 2);
+T = table;
+T.mean = mean(data);
+T.sd = std(data);
+T.sem = std(data)/sqrt(length(participant));
+
 %% explore distributions
 % M1: hostogram - peak amplitude
 fig = figure(figure_counter);

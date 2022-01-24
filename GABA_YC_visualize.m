@@ -201,6 +201,66 @@ for s = 1:2
 end
 clear s peak_n m k fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
+%% ) EFFECT OF ALPRAZOLAM - TEP-MEP CORRELATION
+% get the data
+for m = 1:length(medication)
+    for p = 1:length(participant)    
+        % TEP change = x 
+        x((m-1)*length(participant) + p, :) = squeeze(GABA_YC_results.TEP_M1(m).amplitude.change(p, 2, :));
+        
+        % MEP change = y
+        y((m-1)*length(participant) + p) = GABA_YC_results.MEP(m).amplitude.change(p, 1);
+        
+        % choose colours
+        marker_col((m-1)*length(participant) + p, :) = colours((m-1)*2 + 2, :);
+    end
+end
+clear m p
+
+% calculate and plot for each component of interest
+stats_corr = table;
+for p = 1:length(peaks_M1)
+    % choose x and y
+    data_corr(:, 1) = x(:, p);
+    data_corr(:, 2) = y';
+    
+    % preliminary plot
+    figure(figure_counter)
+    scatter(data_corr(:, 1), data_corr(:, 2))
+    xlabel(peaks_M1{p})
+    ylabel('MEP')
+    figure_counter = figure_counter + 1;
+    
+    % ----- compute the correlation ----        
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_corr(:, 1), data_corr(:, 2), 'VarNames', {peaks_M1{p} 'MEP'});
+    
+    % extract statistics
+    data_table = data_model.Coefficients;
+    data_table.R2(1) = data_model.Rsquared.Ordinary;
+    data_table.R2(2) = data_model.Rsquared.Adjusted;
+    data_table.Properties.RowNames = {};
+    data_table.Variable(1) = {'(intercept)'};
+    data_table.Variable(2) = data_model.VariableNames(1);
+    data_table = data_table(:, [end, 1:end - 1]);
+    stats_corr = [stats_corr; data_table];
+    
+    % ------------- plot -------------
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model, data_corr, marker_col, 'Pearson')
+
+    % save the figure   
+    figure_name = ['corr_TEPxMEP' peaks_M1{p}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+    
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+clear p x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked data_table fig figure_name
+
 %% ) EFFECT OF ALPRAZOLAM - AG TEPs
 peaks_SICI = {'N17' 'P60' 'N100'}; 
 % calculate group mean values
@@ -315,7 +375,9 @@ end
 clear m p
 
 % calculate and plot for each component of interest
+stats_corr = table;
 for p = 1:length(peaks_SICI)
+    % ----- compute the correlation -----
     % choose x and y
     data_corr(:, 1) = x_corr(p, :)'*-1;
     data_corr(:, 2) = y_corr';
@@ -328,7 +390,18 @@ for p = 1:length(peaks_SICI)
     
     % prepare linear model: y ~ 1 + x
     data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNames', {[peaks_SICI{p} ' SICI'] 'MEP SICI'});
-
+    
+    % extract statistics
+    data_table = data_model_ranked.Coefficients;
+    data_table.R2(1) = data_model_ranked.Rsquared.Ordinary;
+    data_table.R2(2) = data_model_ranked.Rsquared.Adjusted;
+    data_table.Properties.RowNames = {};
+    data_table.Variable(1) = {'(intercept)'};
+    data_table.Variable(2) = data_model_ranked.VariableNames(1);
+    data_table = data_table(:, [end, 1:end - 1]);
+    stats_corr = [stats_corr; data_table];
+    
+    % ------------- plot -------------
     % plot data + regression line
     fig = figure(figure_counter);
     hold on
@@ -342,40 +415,40 @@ for p = 1:length(peaks_SICI)
     % update figure counter
     figure_counter = figure_counter + 1;
 end
-clear x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked fig figure_name
+clear p x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked data_table fig figure_name
 
-for p = 1:length(peaks_SICI)
-        % fit
-    [curvefit,gof,output] = fit(x, y, 'exp1');
-    
-    % plot
-    figure(figure_counter)
-    subplot(2, 2, 1)
-    plot(curvefit,x,y)
-    
-    subplot(2, 2, 2)
-    scatter(x,log(y))  
-    
-    subplot(2, 2, 3)
-    plot(curvefit,x,y,'Residuals')
-    
-    subplot(2, 2, 4)
-    plot(curvefit,x,y,'predfunc')
-    
-    % compute coefficients
-    n = length(x);
-    y2 = log(y);
-    j = sum(x);
-    k = sum(y2);
-    r2 = sum(x .* y2);
-    m = sum(y2.^2);
-    c = f.b * (r2 - j * k / n);
-    d = m - k^2 / n;
-    corr = sqrt(c/d);
-    std_err = sqrt((d - c) / (n - 2)); 
-    
-end
-clear x_corr y_corr marker_col p x y curvefit n y2 r2 j k m c d corr std_err gof output
+% for p = 1:length(peaks_SICI)
+%     % fit
+%     [curvefit,gof,output] = fit(x, y, 'exp1');
+%     
+%     % plot
+%     figure(figure_counter)
+%     subplot(2, 2, 1)
+%     plot(curvefit,x,y)
+%     
+%     subplot(2, 2, 2)
+%     scatter(x,log(y))  
+%     
+%     subplot(2, 2, 3)
+%     plot(curvefit,x,y,'Residuals')
+%     
+%     subplot(2, 2, 4)
+%     plot(curvefit,x,y,'predfunc')
+%     
+%     % compute coefficients
+%     n = length(x);
+%     y2 = log(y);
+%     j = sum(x);
+%     k = sum(y2);
+%     r2 = sum(x .* y2);
+%     m = sum(y2.^2);
+%     c = f.b * (r2 - j * k / n);
+%     d = m - k^2 / n;
+%     corr = sqrt(c/d);
+%     std_err = sqrt((d - c) / (n - 2)); 
+%     
+% end
+% clear x_corr y_corr marker_col p x y curvefit n y2 r2 j k m c d corr std_err gof output
 
 %% ) BASELINE SICI - SUBTRACTION
 % ----- decide output parameters -----
@@ -464,7 +537,7 @@ end
 
 % add annotations
 text_pos = [0.90 0.78];
-rectangle('Position', [2, 27, 18, 12], 'FaceColor',[1 1 1], 'EdgeColor', [0.5 0.5 0.5])
+% rectangle('Position', [2, 27, 18, 12], 'FaceColor',[1 1 1], 'EdgeColor', [0.5 0.5 0.5])
 T(1) = text(0.1, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
 T(2) = text(0.1, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Adjusted), 'Units', 'Normalized');
 set(T(1), 'fontsize', 20, 'fontangle', 'italic', 'fontweight', 'bold'); 
