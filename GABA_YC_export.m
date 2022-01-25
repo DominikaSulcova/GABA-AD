@@ -674,6 +674,14 @@ for p = 1:length(participant)
 end
 clear row_cnt p m t s k statement 
 
+% % for MATLAB2016 and lower
+% GABA_YC_medication_MEP = table;
+% GABA_YC_medication_MEP.subject = table_MEP.subject';
+% GABA_YC_medication_MEP.medication = table_MEP.medication';
+% GABA_YC_medication_MEP.time = table_MEP.time';
+% GABA_YC_medication_MEP.rMT = table_MEP.rMT';
+% GABA_YC_medication_MEP.amplitude = table_MEP.amplitude';
+
 % for newer MATLAB
 GABA_YC_medication_MEP = table_MEP;
 
@@ -708,12 +716,8 @@ for p = 1:length(participant)
             eval(statement)
             
             % outcome variables - SE
-            if t == 3
-                table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.change_percent
-            else
-                statement = ['table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.' time_new{t} '.closed(p, 1);'];
-                eval(statement)
-            end
+            statement = ['table_rsEEG.SE(row_cnt) = GABA_YC_results.rsEEG(m).SE.' time_new{t} '.closed(p, 1);'];
+            eval(statement)
             
             % update row count
             row_cnt = row_cnt + 1;
@@ -783,7 +787,7 @@ GABA_YC_SICI = table_SICI;
 
 % save as CSV
 writetable(GABA_YC_SICI, 'GABA_YC_SICI.csv', 'Delimiter', ',');
-clear table_TEP table_rsEEG table_SICI
+clear table_TEP table_MEP table_rsEEG table_SICI 
 
 %% 8) RANOVA: arousal
 timepoint = {'1.5h' '2h' '2.5h'};

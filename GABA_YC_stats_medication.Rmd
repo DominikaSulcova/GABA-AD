@@ -97,7 +97,7 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_var <- 'amplitude'
+target_var <- 'SE'
 target_stim <- ''
 target_peak <- ''
 
@@ -228,9 +228,9 @@ data_trans <- data %>%
   mutate(DV_change = DV_change + c)
 
 # reflect if negatively skewed
-# data_trans <- data_trans %>%
-#   group_by(medication) %>%
-#   mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
+data_trans <- data_trans %>%
+  group_by(medication) %>%
+  mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
 
 # ---- SQUARE ROOT ----
 # create new variable
@@ -456,4 +456,3 @@ However, I am not sure how to report and explain the great significance at the i
 And how do I report random effects, that show very small variance and confidence intervals including 0..? 
 
 I am also not sure hohw to correct the significance levels. Should I use Bonferonni correction for each group of variables, for example if I test M1 TEPs that have 6 components, should I devide alpha by 6..?
-

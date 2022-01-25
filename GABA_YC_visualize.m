@@ -140,7 +140,7 @@ for s = 1:3
 end
 clear s data_visual fig yl c P lgd figure_name
 
-%% ) EFFECT OF ALPRAZOLAM - M1 TEPs
+%% ) EFFECT OF ALPRAZOLAM: M1 TEPs
 % calculate group mean values
 for m = 1:length(medication)
     for s = 1:2
@@ -201,7 +201,7 @@ for s = 1:2
 end
 clear s peak_n m k fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
-%% ) EFFECT OF ALPRAZOLAM - TEP-MEP CORRELATION
+%% ) EFFECT OF ALPRAZOLAM: TEP - MEP CORRELATION
 % get the data
 for m = 1:length(medication)
     for p = 1:length(participant)    
@@ -261,7 +261,160 @@ for p = 1:length(peaks_M1)
 end
 clear p x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked data_table fig figure_name
 
-%% ) EFFECT OF ALPRAZOLAM - AG TEPs
+%% ) EFFECT OF ALPRAZOLAM: TEP - RS-EEG CORRELATION
+% get the data
+for m = 1:length(medication)
+    for p = 1:length(participant)    
+        % TEP change = x 
+        x((m-1)*length(participant) + p, :) = squeeze(GABA_YC_results.TEP_M1(m).amplitude.change(p, 2, 1));
+        
+        % MEP change = y
+        y(1, (m-1)*length(participant) + p) = GABA_YC_results.rsEEG(m).sigma.change(p);
+        y(2, (m-1)*length(participant) + p) = GABA_YC_results.rsEEG(m).delta.change(p);
+        y(3, (m-1)*length(participant) + p) = GABA_YC_results.rsEEG(m).AAC.change(p);
+        y(4, (m-1)*length(participant) + p) = GABA_YC_results.rsEEG(m).SE.change.closed(p, 1);
+         
+        % choose colours
+        marker_col((m-1)*length(participant) + p, :) = colours((m-1)*2 + 2, :);
+    end
+end
+y = y';
+clear m p
+
+% get variable names
+rsEEG_vars = fieldnames(GABA_YC_results.rsEEG)';
+rsEEG_vars = rsEEG_vars(end - size(y, 2) + 1 : end);
+
+% calculate and plot for each component of interest
+stats_corr = table;
+stats_corr_ranked = table;
+for c = 1:size(y, 2)
+    % choose x and y
+    data_corr(:, 1) = x;
+    data_corr(:, 2) = y(:, c);
+    
+    % preliminary plot
+    figure(figure_counter)
+    scatter(data_corr(:, 1), data_corr(:, 2))
+    xlabel('N17')
+    ylabel(rsEEG_vars{c})
+    figure_counter = figure_counter + 1;
+    
+    % ----- compute linear correlation ----     
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_corr(:, 1), data_corr(:, 2), 'VarNames', {'N17' rsEEG_vars{c}});
+    
+    % extract statistics
+    data_table = data_model.Coefficients;
+    data_table.R2(1) = data_model.Rsquared.Ordinary;
+    data_table.R2(2) = data_model.Rsquared.Adjusted;
+    data_table.Properties.RowNames = {};
+    data_table.Variable(1) = {'(intercept)'};
+    data_table.Variable(2) = data_model.VariableNames(1);
+    data_table = data_table(:, [end, 1:end - 1]);
+    stats_corr = [stats_corr; data_table];
+    
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model, data_corr, marker_col, 'Pearson')
+
+    % save the figure   
+    figure_name = ['corr_N17x' rsEEG_vars{c} '_linear'];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+    
+    % update figure counter
+    figure_counter = figure_counter + 1;
+       
+    % ----- compute ranked correlation ----  
+    % rank the data
+    for a = 1:size(data_corr, 2)
+        [temp, data_corr_ranked(:, a)]  = ismember(data_corr(:, a), unique(data_corr(:, a)));
+    end
+    clear a temp
+    
+    % prepare linear model: y ~ 1 + x
+    data_model_ranked = fitlm(data_corr_ranked(:, 1), data_corr_ranked(:, 2), 'VarNames', {'N17' rsEEG_vars{c}});
+    
+    % extract statistics
+    data_table_ranked = data_model_ranked.Coefficients;
+    data_table_ranked.R2(1) = data_model_ranked.Rsquared.Ordinary;
+    data_table_ranked.R2(2) = data_model_ranked.Rsquared.Adjusted;
+    data_table_ranked.Properties.RowNames = {};
+    data_table_ranked.Variable(1) = {'(intercept)'};
+    data_table_ranked.Variable(2) = data_model_ranked.VariableNames(1);
+    data_table_ranked = data_table_ranked(:, [end, 1:end - 1]);
+    stats_corr_ranked = [stats_corr_ranked; data_table_ranked];
+    
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model_ranked, data_corr_ranked, marker_col, 'Spearman')
+
+    % save the figure   
+    figure_name = ['corr_N17x' rsEEG_vars{c} '_ranked'];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+    
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+clear c data_corr data_corr_ranked data_model data_model_ranked...
+    data_table data_table_ranked fig figure_name
+
+% plot separately per medication
+stats_corr_partial = table;
+for c = 1:size(y, 2)
+    % choose x and y
+    data_corr(:, 1) = x;
+    data_corr(:, 2) = y(:, c);
+
+    % prepare linear models
+    data_model_placebo = fitlm(data_corr(1:20, 1), data_corr(1:20, 2), 'VarNames', {'N17' rsEEG_vars{c}});
+    data_model_alprazolam = fitlm(data_corr(21:40, 1), data_corr(21:40, 2), 'VarNames', {'N17' rsEEG_vars{c}});
+
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr_partial(data_model_placebo, data_corr(1:20, :), marker_col(1:20, :), 'Pearson')
+    plot_corr_partial(data_model_alprazolam, data_corr(21:40, :), marker_col(21:40, :), 'Pearson')
+
+    % add annotations
+    text_pos = [0.90 0.78];
+    T(1) = text(0.55, text_pos(1), sprintf( 'y = %1.3f * x', data_model_alprazolam.Coefficients.Estimate(2)),...
+        'Units', 'Normalized', 'Color', marker_col(21, :));
+    T(2) = text(0.55, text_pos(2), sprintf('y = %1.3f * x', data_model_placebo.Coefficients.Estimate(2)),...
+        'Units', 'Normalized', 'Color', marker_col(1, :));
+    set(T, 'fontsize', 20, 'fontangle', 'italic', 'fontweight', 'bold'); 
+
+    % save the figure   
+    figure_name = ['corr_N17x' rsEEG_vars{c} '_partial'];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
+    % update figure counter
+    figure_counter = figure_counter + 1;
+
+    % extract statistics
+    for m = 1:length(medication)
+        statement = ['data_table = data_model_' medication{m} '.Coefficients;'];
+        eval(statement)
+        statement = ['data_table.R2(1) = data_model_' medication{m} '.Rsquared.Ordinary;'];
+        eval(statement)
+        statement = ['data_table.R2(2) = data_model_' medication{m} '.Rsquared.Adjusted;'];
+        eval(statement)
+        data_table.Properties.RowNames = {};
+        data_table.Variable(1) = {'(intercept)'};
+        data_table.Variable(2) = data_model_placebo.VariableNames(2);
+        data_table = data_table(:, [end, 1:end - 1]);
+        stats_corr_partial = [stats_corr_partial; data_table];
+    end
+end
+clear x y rsEEG_vars marker_col data_corr data_model_placebo data_model_alprazolam...
+    data_table fig text_pos T figure_name m statement
+
+%% ) EFFECT OF ALPRAZOLAM: AG TEPs
 peaks_SICI = {'N17' 'P60' 'N100'}; 
 % calculate group mean values
 for m = 1:length(medication)
@@ -311,7 +464,7 @@ saveas(fig, [folder_figures '\' figure_name '.png'])
 figure_counter = figure_counter + 1;
 clear fig barplot b ngroups nbars groupwidth i x_bar figure_name avg_amp avg_amp_sem
 
-%% ) BASELINE SICI - AMPLITUDE CHANGE
+%% ) BASELINE SICI: AMPLITUDE CHANGE
 % get data 
 for m = 1:length(medication) 
     for k = 1:length(peaks_M1) 
@@ -355,7 +508,7 @@ saveas(fig, [folder_figures '\' figure_name '.png'])
 figure_counter = figure_counter + 1; 
 clear m k data_visual sem_visual fig barplot col b ngroups nbars groupwidth i x_bar 
 
-%% ) BASELINE SICI - TEP-MEP CORRELATION
+%% ) BASELINE SICI: TEP - MEP CORRELATION
 % ----- decide output parameters -----
 peaks_SICI = {'N17' 'P60' 'N100'}; 
 % ------------------------------------
@@ -450,7 +603,7 @@ clear p x_corr y_corr marker_col data_corr data_corr_ranked data_model_ranked da
 % end
 % clear x_corr y_corr marker_col p x y curvefit n y2 r2 j k m c d corr std_err gof output
 
-%% ) BASELINE SICI - SUBTRACTION
+%% ) BASELINE SICI: SUBTRACTION
 % ----- decide output parameters -----
 electrode = {'C3'}; 
 % ------------------------------------
@@ -543,5 +696,22 @@ T(2) = text(0.1, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Adjuste
 set(T(1), 'fontsize', 20, 'fontangle', 'italic', 'fontweight', 'bold'); 
 set(T(2), 'fontsize', 20); 
 end
+function plot_corr_partial(data_model, data_corr, marker_col, corr_type)
+% plot correlation
+plot_cor = plotAdded(data_model);
 
+% adjust parameters    
+set(gca, 'FontSize', 20)
+xlabel(data_model.VariableNames{1}); 
+ylabel(data_model.VariableNames{2});
+plot_cor(2).Color = [0 0 0]; plot_cor(2).LineWidth = 4; 
+plot_cor(3).Color = [0 0 0]; plot_cor(3).LineWidth = 2;
+legend off
+title('')
 
+% replot markers
+for c = 1:size(data_corr, 1)
+    scatter(data_corr(c, 1), data_corr(c, 2), 90, marker_col(c, :), 'filled');
+    hold on
+end
+end
