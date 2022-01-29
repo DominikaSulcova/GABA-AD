@@ -932,7 +932,7 @@ for m = 1:length(medication)
             
                 % calculate broad band beta amplitude
                 for p = 1:length(participant)
-                    data_beta(m, t, c, r, b+1, p) =  sum(data_beta(m, t, c, r, [1:b], p));
+                    data_beta(m, t, c, r, b+1, p) =  mean(data_beta(m, t, c, r, [1:b], p));
                 end
             end
         end
@@ -1041,12 +1041,12 @@ end
 clear m t c r rows
 disp(['Datasize: ' num2str(size(data_delta))])
 
-% extract delta amplitude --> occipital region, eyes open
+% extract delta amplitude --> frontal region, eyes open
 for m = 1:length(medication)
     % raw delta
     for t = 1:length(time)
         for p = 1:length(participant)
-            delta(m, t, p) = squeeze(data_delta(m, t, 1, 5, p));
+            delta(m, t, p) = squeeze(data_delta(m, t, 1, 1, p));
         end
     end
     
@@ -1131,7 +1131,7 @@ for m = 1:length(medication)
             
             % calculate broad band alpha amplitude
             for p = 1:length(participant)
-                data_aac(m, t, c, a+1, p) =  sum(data_aac(m, t, c, [1:a], p));
+                data_aac(m, t, c, a+1, p) =  mean(data_aac(m, t, c, [1:a], p));
             end
         end
     end 
@@ -1146,7 +1146,7 @@ for m = 1:length(medication)
     for t = 1:length(time)
         for a = 1:length(alpha_fbands)
             for p = 1:length(participant)
-                ACC(m, t, a, p) = squeeze(data_aac(m, t, 2, a, p)) / squeeze(data_aac(m, t, 1, a, p));
+                AAC(m, t, a, p) = squeeze(data_aac(m, t, 1, a, p)) / squeeze(data_aac(m, t, 2, a, p));
             end
         end
     end
@@ -1154,11 +1154,11 @@ for m = 1:length(medication)
     % calculate AAC change 
     for a = 1:length(alpha_fbands)
         for p = 1:length(participant)
-            ACC_change(m, a, p) = (ACC(m, 2, a, p)/ACC(m, 1, a, p))*100 - 100;
+            AAC_change(m, a, p) = (AAC(m, 2, a, p)/AAC(m, 1, a, p))*100 - 100;
         end
     end
 end
-save('ACC.mat', 'ACC'); save('ACC_change.mat', 'ACC_change'); 
+save('AAC.mat', 'AAC'); save('AAC_change.mat', 'AAC_change'); 
 
 % ----- plot box + scatter plot -----
 % individual ACC - for each alpha band separately
@@ -1167,7 +1167,7 @@ for a = 1:length(alpha_fbands)
     data_visual = [];
     for m = 1:length(medication)
         for t = 1:length(time)
-            data_i = squeeze(ACC(m, t, a, :));
+            data_i = squeeze(AAC(m, t, a, :));
             data_visual = cat(2, data_visual, data_i);
         end
     end

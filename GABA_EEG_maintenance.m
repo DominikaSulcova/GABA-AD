@@ -156,8 +156,8 @@ for m = 1:length(medication)
 end
 
 %% calculte mean values
-data = GABA_YC_results.MEP(2).amplitude.post(:, 2);
-T = table;
+data = GABA_YC_results.rsEEG(2).amplitude.post.open(:, 1, 1);
+T = table; 
 T.mean = mean(data);
 T.sd = std(data);
 T.sem = std(data)/sqrt(length(participant));

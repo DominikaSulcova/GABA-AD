@@ -113,7 +113,7 @@ params = readtable([folder_input '\YC_parameters.csv']);
 
 % fill in basic info
 if ~exist('GABA_YC_results.mat')
-    GABA_results = struct;
+    GABA_YC_results = struct;
     for p = 1:length(participant)
         % subject info
         GABA_YC_results.subjects.age(p) = params{p, 'Age'}; 
@@ -253,15 +253,15 @@ for p = 1:length(participant)
     for m = 1:length(medication)
         for t = 1:length(time)
             % AAC
-            statement = ['GABA_YC_results.rsEEG(m).AAC.' time{t} '(p) = squeeze(ACC(m, t, 4, p));'];
+            statement = ['GABA_YC_results.rsEEG(m).AAC.' time{t} '(p) = squeeze(AAC(m, t, 4, p));'];
             eval(statement)            
         end
         
         % AAC change
-        GABA_YC_results.rsEEG(m).AAC.change(p) = squeeze(ACC_change(m, 4, p));     
+        GABA_YC_results.rsEEG(m).AAC.change(p) = squeeze(AAC_change(m, 4, p));     
     end
 end
-clear ACC ACC_change statement p m t
+clear AAC AAC_change statement p m t
 
 % spectral exponent  
 for p = 1:length(participant)
@@ -642,7 +642,7 @@ clear row_cnt p m t s k statement
 GABA_YC_medication_TEP = table_TEP;
 
 % save as CSV
-writetable(GABA_YC_medication_TEP, 'GABA_YC_medication_TEP.csv', 'Delimiter', ',');
+writetable(GABA_YC_medication_TEP, [folder_output '\GABA_YC_medication_TEP.csv'], 'Delimiter', ',');
 
 % ----- pharmacological activation of GABAARs: MEPs -----
 % prepare empty table
@@ -686,7 +686,7 @@ clear row_cnt p m t s k statement
 GABA_YC_medication_MEP = table_MEP;
 
 % save as CSV
-writetable(GABA_YC_medication_MEP, 'GABA_YC_medication_MEP.csv', 'Delimiter', ',');
+writetable(GABA_YC_medication_MEP, [folder_output '\GABA_YC_medication_MEP.csv'], 'Delimiter', ',');
 
 % ----- pharmacological activation of GABAARs: RS-EEG -----
 % prepare empty table
@@ -740,11 +740,11 @@ clear row_cnt p m t statement
 GABA_YC_medication_rsEEG = table_rsEEG;
 
 % save as CSV
-writetable(GABA_YC_medication_rsEEG, 'GABA_YC_medication_rsEEG.csv', 'Delimiter', ',');
+writetable(GABA_YC_medication_rsEEG, [folder_output '\GABA_YC_medication_rsEEG.csv'], 'Delimiter', ',');
 
-% ----- paired-pulse activation of GABAARs: SICI -----
+% ----- paired-pulse activation of GABAARs: baseline SICI -----
 % prepare empty table
-table_SICI = table;
+table_SICI_bl = table;
 
 % cycle through entries (= rows)
 row_cnt = 1;
@@ -754,16 +754,13 @@ for p = 1:length(participant)
             for k = 1:6
                 % fill corresponding line:
                 % condition info
-                table_SICI.subject(row_cnt) = participant(p);             
-                table_SICI.medication(row_cnt) = medication(m);
-                table_SICI.stimulus(row_cnt) = stimulus(s);
-                table_SICI.peak(row_cnt) = peaks_M1(k);
+                table_SICI_bl.subject(row_cnt) = participant(p);             
+                table_SICI_bl.medication(row_cnt) = medication(m);
+                table_SICI_bl.stimulus(row_cnt) = stimulus(s);
+                table_SICI_bl.peak(row_cnt) = peaks_M1(k);
 
                 % outcome variables - raw amplitude 
-                table_SICI.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k);
-
-                % SICI = change
-                table_SICI.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.pre(p, k);
+                table_SICI_bl.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k);
                 
                 % update row count
                 row_cnt = row_cnt + 1;
@@ -774,20 +771,67 @@ end
 clear row_cnt p m s k  
 
 % % for MATLAB2016 and lower
-% GABA_YC_SICI = table;
-% GABA_YC_SICI.subject = table_SICI.subject';
-% GABA_YC_SICI.medication = table_SICI.medication';
-% GABA_YC_SICI.time = table_SICI.time';
-% GABA_YC_SICI.peak = table_SICI.peak';
-% GABA_YC_SICI.amplitude = table_SICI.amplitude';
-% GABA_YC_SICI.SICI = table_SICI.SICI';
+% GABA_YC_SICI_bl = table;
+% GABA_YC_SICI_bl.subject = table_SICI_bl.subject';
+% GABA_YC_SICI_bl.medication = table_SICI_bl.medication';
+% GABA_YC_SICI_bl.stimulus = table_SICI_bl.stimulus';
+% GABA_YC_SICI_bl.peak = table_SICI_bl.peak';
+% GABA_YC_SICI_bl.amplitude = table_SICI_bl.amplitude';
 
 % for newer MATLAB
-GABA_YC_SICI = table_SICI;
+GABA_YC_SICI_bl = table_SICI_bl;
 
 % save as CSV
-writetable(GABA_YC_SICI, 'GABA_YC_SICI.csv', 'Delimiter', ',');
-clear table_TEP table_MEP table_rsEEG table_SICI 
+writetable(GABA_YC_SICI_bl, [folder_output '\GABA_YC_SICI_baseline.csv'], 'Delimiter', ',');
+
+% ----- paired-pulse activation of GABAARs: SICI x medication -----
+% prepare empty table
+table_SICI_med = table;
+
+% cycle through entries (= rows)
+row_cnt = 1;
+for p = 1:length(participant)
+    for m = 1:length(medication)
+        for t = 1:length(time);
+            for k = 1:6
+                % fill corresponding line:
+                % condition info
+                table_SICI_med.subject(row_cnt) = participant(p);             
+                table_SICI_med.medication(row_cnt) = medication(m);
+                table_SICI_med.time(row_cnt) = time(t);
+                table_SICI_med.peak(row_cnt) = peaks_M1(k);
+
+                % outcome variables - SICI 
+                statement = ['table_SICI_med.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.' time{t} '(p, k);'];
+                eval(statement)
+                
+                % covariate - rMT
+                statement = ['table_SICI_med.rMT(row_cnt) = GABA_YC_results.rmt(m).' time{t} '(p);'];
+                eval(statement)
+                
+                % update row count
+                row_cnt = row_cnt + 1;
+            end
+        end
+    end
+end
+clear row_cnt p m t k statement  
+
+% % for MATLAB2016 and lower
+% GABA_YC_SICI_med = table;
+% GABA_YC_SICI_med.subject = table_SICI_med.subject';
+% GABA_YC_SICI_med.medication = table_SICI_med.medication';
+% GABA_YC_SICI_med.time = table_SICI_med.time';
+% GABA_YC_SICI_med.SICI = table_SICI_med.SICI';
+% GABA_YC_SICI_med.rMT = table_SICI_med.rMT';
+
+% for newer MATLAB
+GABA_YC_SICI_med = table_SICI_med;
+
+% save as CSV
+writetable(GABA_YC_SICI_med, [folder_output '\GABA_YC_SICI_medication.csv'], 'Delimiter', ',');
+
+clear table_TEP table_MEP table_rsEEG table_SICI_bl table_SICI_med 
 
 %% 8) RANOVA: arousal
 timepoint = {'1.5h' '2h' '2.5h'};
