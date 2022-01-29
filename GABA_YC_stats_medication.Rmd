@@ -97,7 +97,7 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_var <- 'SE'
+target_var <- 'AAC'
 target_stim <- ''
 target_peak <- ''
 
@@ -228,9 +228,9 @@ data_trans <- data %>%
   mutate(DV_change = DV_change + c)
 
 # reflect if negatively skewed
-data_trans <- data_trans %>%
-  group_by(medication) %>%
-  mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
+# data_trans <- data_trans %>%
+#   group_by(medication) %>%
+#   mutate(DV_change = max(data_trans$DV_change) - DV_change + 1)
 
 # ---- SQUARE ROOT ----
 # create new variable

@@ -342,7 +342,6 @@ model <- lme(
   method = 'ML'
 )
 
-
 # fixed effects
 broom.mixed::tidy(model, effects = 'fixed') %>% 
   knitr::kable()
