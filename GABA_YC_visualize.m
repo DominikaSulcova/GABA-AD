@@ -668,6 +668,119 @@ figure_counter = figure_counter + 1 ;
 
 clear electrode e e_n x data_visual CI_visual fig yl P F lgd figure_name 
 
+%% ) BASELINE SICI vs. EFFECT OF ALPRAZOLAM: N17 
+% get the data - only from the alprazolam session
+for p = 1:length(participant)    
+    % SICI of N17 = x 
+    x_corr(p) = GABA_YC_results.SICI(2).TEP.pre(p, contains(peaks_M1, 'N17'))';
+
+    % alprazolam induced change in N17 = y
+    y_corr(p) = GABA_YC_results.TEP_M1(2).amplitude.change(p, 2, contains(peaks_M1, 'N17'));
+
+    % choose colours
+    marker_col(p, :) = colours(4, :);
+end
+clear p
+scatter(x_corr, y_corr)
+
+% ----- compute the correlation -----
+% choose x and y
+data_corr(:, 1) = x_corr';
+data_corr(:, 2) = y_corr';
+    
+% prepare linear model: y ~ 1 + x
+data_model = fitlm(data_corr(:, 1), data_corr(:, 2), 'VarNames', {'effect of SICI' 'effect of alprazolam'});
+    
+% extract statistics
+stats_corr = data_model.Coefficients;
+stats_corr.R2(1) = data_model.Rsquared.Ordinary;
+stats_corr.R2(2) = data_model.Rsquared.Adjusted;
+stats_corr.Properties.RowNames = {};
+stats_corr.Variable(1) = {'(intercept)'};
+stats_corr.Variable(2) = data_model.VariableNames(1);
+stats_corr = stats_corr(:, [end, 1:end - 1]);
+
+% ------------- plot -------------
+% plot data + regression line
+fig = figure(figure_counter);
+hold on
+plot_corr(data_model, data_corr, marker_col, 'Pearson')
+
+% save the figure   
+figure_name = 'corr_SICI_alprazolam_N17';
+savefig([folder_figures '\' figure_name '.fig'])
+saveas(fig, [folder_figures '\' figure_name '.png'])
+
+% update figure counter
+figure_counter = figure_counter + 1;
+clear x_corr y_corr marker_col data_corr data_model fig figure_name
+
+%% ) BASELINE SICI vs. EFFECT OF ALPRAZOLAM: N17 vs. RS-EEG
+% ----- decide output parameters -----
+rsEEG_vars = {'sigma' 'delta' 'AAC' 'SE'}; 
+% ------------------------------------
+% get the data - only from the alprazolam session
+for p = 1:length(participant)    
+    % TEP SICI = x 
+    x_corr(p) = GABA_YC_results.SICI(2).TEP.pre(p, contains(peaks_M1, 'N17'))';
+
+    % RS-EEG = y
+    for v = 1:length(rsEEG_vars)
+        if v < 4
+            statement = ['y_corr(v, p) = GABA_YC_results.rsEEG(2).' rsEEG_vars{v} '.change(p);'];
+            eval(statement)
+        else
+            y_corr(v, p) = GABA_YC_results.rsEEG(2).SE.change.closed(p);
+        end
+    end
+
+    % choose colours
+    marker_col(p, :) = colours(4, :);
+end
+clear p v statement
+
+% calculate and plot for each component of interest
+stats_corr = table;
+for v = 1:length(rsEEG_vars)
+    % ----- compute the correlation -----
+    % choose x and y
+    figure(figure_counter)
+    data_corr(:, 1) = x_corr';
+    data_corr(:, 2) = y_corr(v, :)';
+    scatter(data_corr(:, 1), data_corr(:, 2))
+    
+    % update figure counter
+    figure_counter = figure_counter + 1;
+
+    % prepare linear model: y ~ 1 + x
+    data_model = fitlm(data_corr(:, 1), data_corr(:, 2), 'VarNames', {'N17 SICI' rsEEG_vars{v}});
+    
+    % extract statistics
+    data_table = data_model.Coefficients;
+    data_table.R2(1) = data_model.Rsquared.Ordinary;
+    data_table.R2(2) = data_model.Rsquared.Adjusted;
+    data_table.Properties.RowNames = {};
+    data_table.Variable(1) = {'(intercept)'};
+    data_table.Variable(2) = data_model.VariableNames(1);
+    data_table = data_table(:, [end, 1:end - 1]);
+    stats_corr = [stats_corr; data_table];
+    
+    % ------------- plot -------------
+    % plot data + regression line
+    fig = figure(figure_counter);
+    hold on
+    plot_corr(data_model, data_corr, marker_col, 'Pearson')
+
+    % save the figure   
+    figure_name = ['corr_SICI_N17_alprazolam_' rsEEG_vars{v}];
+    savefig([folder_figures '\' figure_name '.fig'])
+    saveas(fig, [folder_figures '\' figure_name '.png'])
+
+    % update figure counter
+    figure_counter = figure_counter + 1;
+end
+clear v x_corr y_corr marker_col data_corr data_model fig figure_name data_table
+
 %% FUNCTIONS
 function plot_corr(data_model, data_corr, marker_col, corr_type)
 % plot correlation
