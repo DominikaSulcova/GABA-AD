@@ -89,51 +89,108 @@ condition = fieldnames(data);
 clear rd
 
 %% ) TANOVA OUTCOME 
-for d = 1:numel(condition)
+for c = 1:numel(condition)
     % extract comparison names
-    statement = ['comps = {data.' condition{d} '.strF1, data.' condition{d} '.strF2, [data.' condition{d} '.strF1 '' * '' data.' condition{d} '.strF2]};'];
+    statement = ['comps = {data.' condition{c} '.strF1, data.' condition{c} '.strF2, [data.' condition{c} '.strF1 '' * '' data.' condition{c} '.strF2]};'];
     eval(statement)
     
     % TANOVA p value
     for a = 1:length(comps)
         % load data
-        statement = ['data_visual(a, :) = squeeze(data.' condition{d} '.PTanova(1, a+1, :, 1));'];
-        eval(statement)
-        
-        % define intervals of significance
-        signif_05 = data_visual < 0.05;
-        signif_01 = data_visual < 0.01;
+        statement = ['data_visual = squeeze(data.' condition{c} '.PTanova(1, a+1, :, 1));'];
+        eval(statement)       
         
         % plot the p-value timecourse
-        % launch the figure
-        fig = figure(figure_counter);
-        hold on
-        
-        % shade intervals of significance
-        I(1) = area(x, signif_05);
-        I(1).FaceColor = [1 0.73 0.73];
-        I(1).EdgeColor = 'none';
-        I(2) = area(x, signif_01);
-        I(2).FaceColor = [1 0.44 0.44];
-        I(2).EdgeColor = 'none';
-        
-        % plot p
-        P = plot(x, data_visual, 'Color', [0 0 0], 'LineWidth', 3);
-        
-        % other parameters
-        title([condition{d} ' TANOVA: factor ''' comps{a} ''''])
-        xlabel('time (ms)')
-        ylabel('probability')
-        set(gca, 'FontSize', 18)
-        xlim([analysis_window(1) + 1, analysis_window(2)] )    
-        hold off
+        fig = plot_TANOVA(x, data_visual, figure_counter, analysis_window);        
+%         title([condition{c} ' TANOVA: factor ''' comps{a} ''''])               
+                
+        % name and save figure
+        figure_name = ['TANOVA_' condition{c}];
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
 
-        % change figure size
-        fig.Position = [500 500 750 300];
+        % update figure counter
+        figure_counter = figure_counter + 1 ;       
+    end 
+    
+    % explained variance
+    for a = 1:length(comps)
+        % load data
+        statement = ['data_visual = squeeze(data.' condition{c} '.TanovaEffectSize(1, a+1, :, 1));'];
+        eval(statement)       
         
-    end   
+        % plot the p-value timecourse
+        fig = plot_EV(x, data_visual, figure_counter, analysis_window);
+        
+        % name and save figure
+        figure_name = ['TANOVA_EV_' condition{c}];
+        savefig([folder_figures '\' figure_name '.fig'])
+        saveas(fig, [folder_figures '\' figure_name '.png'])
 
+        % update figure counter
+        figure_counter = figure_counter + 1 ;       
+    end  
 end
-clear d a statement signif_05 signif_01 fig I 
+clear c a statement fig figure_name
+
+%% functions
+function fig = plot_TANOVA(x, data_visual, figure_counter, analysis_window)
+    fig = figure(figure_counter);
+    hold on
+    
+    % define intervals of significance
+    signif_05 = data_visual < 0.05;
+    signif_01 = data_visual < 0.01;
+    
+    % shade intervals of significance
+    I(1) = area(x, signif_05);
+    I(1).FaceColor = [1 0.73 0.73];
+    I(1).EdgeColor = 'none';
+    I(2) = area(x, signif_01);
+    I(2).FaceColor = [1 0.44 0.44];
+    I(2).EdgeColor = 'none';
+    
+    % plot p
+    P = plot(x, data_visual, 'Color', [0 0 0], 'LineWidth', 3);
+    
+    % other parameters  
+    set(gca, 'xtick', [])
+%     xlabel('time (ms)')
+    ylabel('probability')
+    set(gca, 'FontSize', 18)
+    xlim([analysis_window(1) + 1, analysis_window(2)])    
+    set(gca, 'layer', 'top');
+    
+    % change figure size
+    fig.Position = [500 500 750 300];
+    
+    hold off
+end
+function fig = plot_EV(x, data_visual, figure_counter, analysis_window)
+    fig = figure(figure_counter);
+    hold on
+    
+    % shade area of explained variance
+    A = area(x, data_visual*100);
+    A.FaceColor = [0.65 0.65 0.65];
+    A.EdgeColor = 'none';
+
+    % other parameters    
+%     set(gca, 'xtick', [])
+    xlabel('time (ms)')
+    ylabel('% explained variance')
+    set(gca, 'FontSize', 18)
+    xlim([analysis_window(1) + 2, analysis_window(2)] )   
+    set(gca, 'layer', 'top');
+
+    % change figure size
+    fig.Position = [500 500 750 300];
+    
+    hold off
+end
+
+
+
+
 
 
