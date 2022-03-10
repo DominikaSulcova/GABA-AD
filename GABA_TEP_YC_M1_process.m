@@ -2537,7 +2537,7 @@ title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
 set(gca, 'fontsize', 12); xlabel('time (s)')
 ax = gca; ax.XColor = [0.5 0.5 0.5];
 plot(x, data_visual(1, :), 'Color', colours(1, :), 'LineWidth', 2.5)
-fill([x fliplr(x)],[data_visual(2, :) zeros(1, length(data_visual(2, :)))], ...
+fill([x fliplr(x)],c, ...
     colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
 line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
 line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)

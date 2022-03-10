@@ -76,21 +76,6 @@ TEP_mean(3, :, :, :, :) = squeeze(TEP_AG(:, :, 1:30, :));
 TEP_mean(4, :, :, :, :) = squeeze(TEP_M1(:, :, 3, 1:30, :));
 clear GABA_data_mean TEP_AG TEP_M1
 
-% average GFP
-load([folder_results '\GABA_' group '_variables\GABA_' group '_M1_TEPs.mat'], 'GABA_GFP_mean')
-GFP_M1 = GABA_GFP_mean;
-disp(['M1 GFP - datasize: ' num2str(size(GFP_M1))])
-
-load([folder_results '\GABA_' group '_variables\GABA_' group '_AG_TEPs.mat'], 'GABA_GFP_mean')
-GFP_AG = GABA_GFP_mean;
-disp(['AG GFP - datasize: ' num2str(size(GFP_AG))])
-
-GFP_mean(1, :, :, :) = squeeze(GFP_M1(:, :, 1, :));
-GFP_mean(2, :, :, :) = squeeze(GFP_M1(:, :, 2, :));
-GFP_mean(3, :, :, :) = squeeze(GFP_AG(:, :, :));
-GFP_mean(4, :, :, :) = squeeze(GFP_M1(:, :, 3, :));
-clear GABA_GFP_mean GFP_AG GFP_M1
-
 % SICI
 load([folder_results '\GABA_' group '_variables\GABA_' group '_M1_TEPs.mat'], 'GABA_SICI')
 
@@ -147,85 +132,12 @@ for s = 1:3
         figure_name = ['TEP_' stimulus{s}(1:2) '_baseline'];
     end
     savefig([folder_figures '\' figure_name '.fig'])
-    saveas(fig, [folder_figures '\' figure_name '.png'])
+    saveas(fig, [folder_figures '\' figure_name '.svg'], 'svg')
 
     % update figure counter
     figure_counter = figure_counter + 1 ;
 end
 clear s data_visual fig yl c P lgd figure_name
-
-
-%% ) GFP PER CONDITION
-% time axis
-x = [-50:0.5:300];
-
-% define time intervals of inconsistency
-incons_t = {[10:23, 33:53], [], [10:60]};
-incons = {zeros(1, length(x)), zeros(1, length(x)), zeros(1, length(x))};
-for s = 1:length(incons)
-    incons{s}(incons_t{s}) = 1;
-end
-
-% plot the GFP with TCT results for all stimuli
-for s = 1:3
-    % prepare baseline data data (placebo session)
-    for i = 1:size(GFP_mean, 4)
-        data_visual(i) = mean(GFP_mean(s, :, :, i), 'all');
-    end
-
-    % launch the figure
-    fig = figure(figure_counter);
-    hold on
-
-    % set limits of y
-    switch s
-        case 1
-            yl = [0 2.1];
-        case 2
-            yl = [0 4.6];
-        case 3
-            yl = [0 3.1];
-    end
-    ylim(yl)
-
-    % shade interpolated interval 
-    rectangle('Position', [-5, yl(1) + 0.01, 15, yl(2) - yl(1) - 0.01], 'FaceColor', [0.99 0.73 0.73], 'EdgeColor', 'none')
-
-    % plot intervals of inconsistency
-    I = area(incons{s} * yl(2));
-    I.FaceColor = [0.85 0.85 0.85];
-    I.EdgeColor = 'none';
-    
-    % plot GFP   
-    P = plot(x, data_visual, 'Color', [0 0 0], 'LineWidth', 3);
-        
-    % TMS stimulus
-    line([0, 0], yl, 'Color', [0.88 0.08 0.08], 'LineWidth', 3)
-
-    % other parameters
-    title(['overall GFP: ' stimulus{s}])
-    xlabel('time (ms)')
-    ylabel('amplitude (\muV)')
-    set(gca, 'FontSize', 18)
-    xlim([x(1), x(end)])    
-    hold off
-    
-    % change figure size
-    fig.Position = [500 500 750 300];
-
-    % name and save figure
-    if length(stimulus{s}) > 2
-        figure_name = ['GFP_incons_' stimulus{s}(1:2) '_' stimulus{s}(end-1:end)];
-    else
-        figure_name = ['GFP_incons_' stimulus{s}(1:2)];
-    end
-    savefig([folder_figures '\' figure_name '.fig'])
-    saveas(fig, [folder_figures '\' figure_name '.png'])
-
-    % update figure counter
-    figure_counter = figure_counter + 1 ;
-end
-clear s i data_visual fig yl I P lgd figure_name
 
 %% ) EFFECT OF ALPRAZOLAM: M1 TEPs
 % calculate group mean values
