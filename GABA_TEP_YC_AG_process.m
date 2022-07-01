@@ -308,7 +308,7 @@ labeled = 'off';
 max_peaks = 6;
 % ------------------------------------
 if exist('GABA_data') ~= 1
-    load([folder_results '\' filename '.mat'], 'GABA_data')
+    load([folder_results '\variables\' filename '.mat'], 'GABA_data')
 end
 
 % calculate mean GFP (exclude target channel)
@@ -321,10 +321,11 @@ clear m t
 
 % ----- plot global GFP -----
 % pool all conditions together
-for i = 1:size(GABA_GFP_mean, 3)
-    data_visual(i) = mean(GABA_GFP_mean(:, :, i), 'all');
-end
-clear i
+% for i = 1:size(GABA_GFP_mean, 3)
+%     data_visual(i) = mean(GABA_GFP_mean(:, :, i), 'all');
+% end
+% clear i
+data_visual = squeeze(mean(GABA_GFP_mean(:, 1, :), 1));
 
 % launch the figure
 fig = figure(figure_counter);

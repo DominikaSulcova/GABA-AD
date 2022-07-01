@@ -9,6 +9,7 @@
 % 3) BASELINE: test of topographic consistency
 % 4) ALL COMPARISONS: TANOVA
 % 5) EFFECT OF ALPRAZOLAM: GFP
+% 6) EFFECT OF ALPRAZOLAM: GFP - RAGU output
 
 %% parameters
 clear all; clc

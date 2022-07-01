@@ -1146,7 +1146,7 @@ for m = 1:length(medication)
     for t = 1:length(time)
         for a = 1:length(alpha_fbands)
             for p = 1:length(participant)
-                AAC(m, t, a, p) = squeeze(data_aac(m, t, 1, a, p)) / squeeze(data_aac(m, t, 2, a, p));
+                AAC(m, t, a, p) = squeeze(data_aac(m, t, 2, a, p)) / squeeze(data_aac(m, t, 1, a, p));
             end
         end
     end
@@ -1232,7 +1232,7 @@ for a = 1:length(alpha_fbands)
     % choose the data
     data_visual = [];
     for m = 1:length(medication)
-        data_i = squeeze(ACC_change(m, a, :));
+        data_i = squeeze(AAC_change(m, a, :));
         data_visual = cat(2, data_visual, data_i);
     end
 

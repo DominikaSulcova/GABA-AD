@@ -1,4 +1,4 @@
-function fig = correlation_preview(data, varnames, varargin) 
+function [fig, cor_coef, cor_p] = correlation_preview(data, varnames, varargin) 
 % ---------------------------------------------------------
 % Author: Dominika
 % Fcn:  1) calculates correlation coefficients and p values across all
@@ -35,7 +35,7 @@ end
 % calculate correlation coefficients and p values
 [cor_coef, cor_p] = corr(data, 'Type', method);
 
-% in case of Spearman correlation, rakn the data
+% in case of Spearman correlation, rank the data
 if strcmp(method, 'Spearman')
     for c = 1:size(data, 2)
         [temp, data(:, c)]  = ismember(data(:, c), unique(data(:, c)));

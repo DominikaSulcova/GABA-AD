@@ -112,7 +112,8 @@ ROI(5).electrodes = {'P3' 'P4' 'Pz' 'P7' 'P8' 'O1' 'O2' 'Iz'};
 params = readtable([folder_input '\YC_parameters.csv']);
 
 % fill in basic info
-if ~exist('GABA_YC_results.mat')
+if ~exist([folder_output '\GABA_YC_results.mat'])
+    % insert data from parameters
     GABA_YC_results = struct;
     for p = 1:length(participant)
         % subject info
@@ -137,12 +138,12 @@ if ~exist('GABA_YC_results.mat')
         GABA_YC_results.arousal(2).assessment_2(p) = params{p, 7 + 2};
         GABA_YC_results.arousal(2).assessment_3(p) = params{p, 7 + 3};
     end
+    
+    % save the output variable
+    save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results')
 else
     load([folder_output '\GABA_YC_results.mat'])
 end
-
-% save the output variable
-save([folder_output '\GABA_YC_results.mat'], 'GABA_YC_results')
 
 %% 2) RS-EEG 
 % load data
@@ -759,8 +760,11 @@ for p = 1:length(participant)
                 table_SICI_bl.stimulus(row_cnt) = stimulus(s);
                 table_SICI_bl.peak(row_cnt) = peaks_M1(k);
 
-                % outcome variables - raw amplitude 
+                % outcome variables - raw TEP amplitude 
                 table_SICI_bl.amplitude(row_cnt) = GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k);
+                
+                % outcome variables - raw MEP amplitude 
+                table_SICI_bl.amplitude_MEP(row_cnt) = GABA_YC_results.MEP(m).amplitude.pre(p, s-1);
                 
                 % update row count
                 row_cnt = row_cnt + 1;
@@ -801,8 +805,12 @@ for p = 1:length(participant)
                 table_SICI_med.time(row_cnt) = time(t);
                 table_SICI_med.peak(row_cnt) = peaks_M1(k);
 
-                % outcome variables - SICI 
+                % outcome variables - TEP SICI 
                 statement = ['table_SICI_med.SICI(row_cnt) = GABA_YC_results.SICI(m).TEP.' time{t} '(p, k);'];
+                eval(statement)
+                
+                % outcome variables - TEP SICI 
+                statement = ['table_SICI_med.SICI_MEP(row_cnt) = GABA_YC_results.SICI(m).MEP.' time{t} '(p);'];
                 eval(statement)
                 
                 % covariate - rMT
@@ -1386,16 +1394,16 @@ writematrix(data_avg(:, :, 3), [folder_output '\GABA_YC_ranova.xlsx'],...
     'Sheet', 'rsEEG - SE', 'WriteMode', 'append')
 clear data data_avg data_table rm wd ranova_data yl
 
-%% 14) CORRELATION: TEP x MEP
+%% 14a) CORRELATION: TEP x MEP
 % variable names
-varnames = [peaks, {'MEP'}];
+varnames = [peaks_M1, {'MEP'}];
 
 % ----- extract data: all TS and ppTMS together -----
 data_cor = [];
 for m = 1:length(medication)
     for s = [2 3]
         % TEPs 
-        for k = 1:length(peaks)
+        for k = 1:length(peaks_M1)
             row_counter = 1;
             for p = 1:length(participant)               
                 data_i(row_counter:row_counter+1, k) = [GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, k); GABA_YC_results.TEP_M1(m).amplitude.post(p, s, k)]; 
@@ -1418,7 +1426,7 @@ clear m s p k data_i
 
 % ----- overview of correlation between all variables - ranked data -----             
 % create correlation matrix
-fig = correlation_preview(data_cor, varnames, 'method', 'Spearman'); 
+[fig, coefficients, p_values] = correlation_preview(data_cor, varnames, 'method', 'Spearman'); 
 
 % save figure
 fig_name = 'corr_TEPxMEP_ranked_overview';
@@ -1474,10 +1482,10 @@ for a = 1:length(row)
         set(T(3), 'fontsize', 14, 'color', colours(3, :)); 
 
         % save figure and continue
-        fig_name = ['corr_TEPxMEP_ranked_' varnames{row(a)} '_' varnames{col(a)}];
-        savefig([folder_figures '\' fig_name '.fig'])
-        saveas(fig, [folder_figures '\' fig_name  '.png'])  
-        figure_counter = figure_counter + 1;
+%         fig_name = ['corr_TEPxMEP_ranked_' varnames{row(a)} '_' varnames{col(a)}];
+%         savefig([folder_figures '\' fig_name '.fig'])
+%         saveas(fig, [folder_figures '\' fig_name  '.svg'])  
+%         figure_counter = figure_counter + 1;
     end
 end
 clear data_cor cor_coef cor_p data_model plot_cor row col fig figure_name T text_pos m s a temp row_counter 
@@ -1510,7 +1518,80 @@ saveas(fig, [folder_figures '\' fig_name  '.png'])
 figure_counter = figure_counter + 1;
 clear varnames fig fig_name
 
-%% 15) CORRELATION: TEP change x RS-EEG change
+%% 14b) CORRELATION: TEP x MEP - N17
+varnames = {'N17' 'MEP'};
+
+% get the data
+data_cor = [];
+for m = 1:length(medication)
+    for s = [2 3]
+        % TEPs 
+        row_counter = 1;
+        for p = 1:length(participant)               
+            data_i(row_counter:row_counter+1, 1) = [GABA_YC_results.TEP_M1(m).amplitude.pre(p, s, 1); GABA_YC_results.TEP_M1(m).amplitude.post(p, s, 1)]; 
+            row_counter = row_counter + 2;
+        end
+
+        % MEPs
+        row_counter = 1;
+        for p = 1:length(participant)              
+            data_i(row_counter:row_counter+1, 2) = [GABA_YC_results.MEP(m).amplitude.pre(p, s-1); GABA_YC_results.MEP(m).amplitude.post(p, s-1)];
+            row_counter = row_counter + 2;
+        end
+        
+        % append to global data matrix
+        data_cor = [data_cor; data_i];
+    end
+end
+clear m s p k data_i
+
+% % rank the data - reverse order of N17 --> more negative = bigger amplitude
+% [sd, data_cor_ranked(:, 1)] = sort(data_cor(:, 1), 'descend');
+% [sd, data_cor_ranked(:, 2)] = sort(data_cor(:, 2), 'ascend');
+% clear sd
+
+% rank the data
+for a = 1:size(data_cor, 2)
+    [temp, data_cor(:, a)]  = ismember(data_cor(:, a), unique(data_cor(:, a)));
+end
+
+% identify p    
+[cor_coef, cor_p] = corr(data_cor, 'Type', 'Spearman');
+
+% prepare linear model: y ~ 1 + x
+data_model = fitlm(data_cor(:, 1), data_cor(:, 2), 'VarNames', varnames);
+
+% plot data + regression line
+fig = figure(figure_counter);
+hold on
+plot_cor = plotAdded(data_model);
+
+% adjust parameters    
+% title(['Spearman rank correlation: ' varnames{2} ' ~ ' varnames{1}])
+xlabel(varnames{1}); ylabel(varnames{2});
+set(gca, 'FontSize', 20)
+plot_cor(1).Marker = 'o'; plot_cor(1).MarkerSize = 8; 
+plot_cor(1).MarkerEdgeColor = colours(1, :); plot_cor(1).MarkerFaceColor = colours(1, :);
+plot_cor(2).Color = [0 0 0]; plot_cor(2).LineWidth = 4; 
+plot_cor(3).Color = [0 0 0]; plot_cor(3).LineWidth = 2;
+legend off
+text_pos = [0.90 0.78 0.66];
+T(1) = text(0.1, text_pos(1), sprintf( 'y = %1.3f * x', data_model.Coefficients.Estimate(2)), 'Units', 'Normalized');
+T(2) = text(0.1, text_pos(2), sprintf('R^2 = %1.3f', data_model.Rsquared.Ordinary), 'Units', 'Normalized');
+T(3) = text(0.1, text_pos(3), sprintf('p = %1.5f', cor_p(1, 2)), 'Units', 'Normalized');
+set(T(1), 'fontsize', 20, 'fontangle', 'italic'); 
+set(T(2), 'fontsize', 20, 'fontweight', 'bold'); 
+set(T(3), 'fontsize', 20, 'fontweight', 'bold'); 
+set(gca, 'XDir','reverse')
+title ''
+
+% save figure and continue
+fig_name = 'corr_N17xMEP_all_ranked';
+savefig([folder_figures '\' fig_name '.fig'])
+saveas(fig, [folder_figures '\' fig_name  '.svg'])  
+figure_counter = figure_counter + 1;
+
+%% 15a) CORRELATION: TEP change x RS-EEG change
 % variable names
 varnames = [peaks, {'beta' 'delta' 'AAC' 'SE'}];
 
@@ -1538,7 +1619,7 @@ clear m s p k
 
 % ----- overview of linear correlation between all variables -----
 for m = 1:length(medication)
-    for s = [1 2]
+    for s = 2%[1 2]
         % select the data                
         mat_cor = squeeze(data_cor(m, s, :, :));
         
@@ -1546,10 +1627,10 @@ for m = 1:length(medication)
         fig = correlation_preview(mat_cor, varnames, 'method', 'Pearson'); 
         
         % save figure
-        fig_name = ['corr_TEPxrsEEG_linear_' medication{m} '_' stimulus{s} '_overview'];
-        savefig([folder_figures '\' fig_name '.fig'])
-        saveas(fig, [folder_figures '\' fig_name  '.png'])   
-        
+%         fig_name = ['corr_TEPxrsEEG_linear_' medication{m} '_' stimulus{s} '_overview'];
+%         savefig([folder_figures '\' fig_name '.fig'])
+%         saveas(fig, [folder_figures '\' fig_name  '.png'])   
+%         
         % update figure counter
         figure_counter = figure_counter + 1;
     end
@@ -1558,7 +1639,7 @@ clear m s fig fig_name
 
 % ----- overview of correlation between all variables - ranked data -----
 for m = 1:length(medication)
-    for s = [1 2]
+    for s = 2%[1 2]
         % select the data                
         mat_cor = squeeze(data_cor(m, s, :, :));
         
@@ -1566,9 +1647,9 @@ for m = 1:length(medication)
         fig = correlation_preview(mat_cor, varnames, 'method', 'Spearman'); 
         
         % save figure
-        fig_name = ['corr_TEPxrsEEG_ranked_' medication{m} '_' stimulus{s} '_overview'];
-        savefig([folder_figures '\' fig_name '.fig'])
-        saveas(fig, [folder_figures '\' fig_name  '.png']) 
+%         fig_name = ['corr_TEPxrsEEG_ranked_' medication{m} '_' stimulus{s} '_overview'];
+%         savefig([folder_figures '\' fig_name '.fig'])
+%         saveas(fig, [folder_figures '\' fig_name  '.png']) 
         
         % update figure counter
         figure_counter = figure_counter + 1;
@@ -1704,7 +1785,6 @@ for m = 1:length(medication)
     end
 end
 clear varnames data_cor mat_cor cor_coef cor_p data_model plot_cor row col fig fig_name T text_pos m s a temp peaks_n alpha_cor
-
 
 %% 16) CORRELATION: TEP SICI x MEP SICI 
 % variable names
@@ -1942,12 +2022,12 @@ clear varnames data_cor cor_coef cor_p data_model plot_cor row col fig fig_name 
 
 %% 18) CORRELATION: TEP-peak SICI x MEP SICI 
 % variable names
-varnames = [peaks {'MEP-SICI'}];
+varnames = [peaks_M1 {'MEP-SICI'}];
 
 % ----- extract data: baseline -----
 for m = 1:length(medication)
     % TEP peak-SICI 
-    for k = 1:length(peaks)
+    for k = 1:length(peaks_M1)
         for p = 1:length(participant)               
             data_cor((m-1)*length(participant) + p, k) = GABA_YC_results.SICI(m).TEP.pre(p, k);
         end
@@ -1962,7 +2042,7 @@ clear m p k
 
 % ----- significant linear correlation -----
 % Bonferroni correction of alpha
-alpha_cor = alpha/length(peaks);
+alpha_cor = alpha/length(peaks_M1);
 
 % identify significant cases        
 [cor_coef, cor_p] = corrcoef(data_cor);
@@ -1974,7 +2054,7 @@ for a = 1:length(row)
     data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
 
     % choose only correlations that show TEP-rsEEG interactions
-    if ismember(row(a), 1:length(peaks)) && col(a) == length(peaks) + 1            
+    if ismember(row(a), 1:length(peaks_M1)) && col(a) == length(peaks_M1) + 1            
         % plot data + regression line
         fig = figure(figure_counter);
         hold on
@@ -2012,7 +2092,7 @@ clear cor_coef alpha_cor cor_p data_model plot_cor row col fig fig_name T text_p
 
 % ----- significant ranked correlation -----  
 % Bonferroni correction of alpha
-alpha_cor = alpha/length(peaks);
+alpha_cor = alpha/length(peaks_M1);
 
 % identify significant cases        
 [cor_coef, cor_p] = corr(data_cor, 'Type', 'Spearman');
@@ -2029,7 +2109,7 @@ for a = 1:length(row)
     data_model = fitlm(data_cor(:, row(a)), data_cor(:, col(a)), 'VarNames', [varnames(row(a)) varnames(col(a))]);
 
     % choose only correlations that show TEP-rsEEG interactions
-    if ismember(row(a), 1:length(peaks)) && col(a) == length(peaks) + 1            
+    if ismember(row(a), 1:length(peaks_M1)) && col(a) == length(peaks_M1) + 1            
         % plot data + regression line
         fig = figure(figure_counter);
         hold on

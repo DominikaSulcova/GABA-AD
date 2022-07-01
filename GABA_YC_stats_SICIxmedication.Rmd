@@ -1,5 +1,5 @@
 ---
-title: 'GABA-AD: Effect of paired-pulse activation of local GABAARs'
+title: 'GABA-AD: Interaction of SICI and pharmacological GABAAR activation'
 output:
   html_notebook:
     theme:
@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F, comment = NA, autodep 
 
 ## **STUDY DESCRIPTION**
 ### Aim and hypothesis
-The project aims to identify specific changes in our primary outcome measures (TMS-evoked potentials, TEPs) following the pre-activation of local network of cortical interneurons using a paired-pulse TMS protocol. The conditioning stimulus (CS) of a sub-threshold intensity (80%rMT) his used to depolarize the low-threshold inhibitory interneuron at the site of the stimulation, which leads to a decrease in cortical excitability and a weaker response to the subsequent testing stimulus (TS). This phenomenon is called the Short-latency IntraCortical Inhibition (SICI) and was originally measured in motor evoked potentials.
+The project aims to identify specific changes in our primary outcome measures (TMS-evoked potentials, TEPs) following the pre-activation of local network of cortical interneurons using a paired-pulse TMS protocol. The conditioning time (CS) of a sub-threshold intensity (80%rMT) his used to depolarize the low-threshold inhibitory interneuron at the site of the stimulation, which leads to a decrease in cortical excitability and a weaker response to the subsequent testing time (TS). This phenomenon is called the Short-latency IntraCortical Inhibition (SICI) and was originally measured in motor evoked potentials.
 
 However, we can measure brain’s reaction to TMS more directly with TEPs, and we expect to see changes that will correspond to the increased local GABAA neurotransmission. The size of this effect can be then used to assess the efficiency of the system specifically at the site of stimulation. 
 
@@ -25,18 +25,20 @@ However, we can measure brain’s reaction to TMS more directly with TEPs, and w
 20 subjects participated in 2 experimental sessions. Each session the same measures were taken at the baseline and after medication with either alprazolam (an allosteric BDZ agonist of GABAARs) or placebo. 
 
 The question we aim to answer with our data are as follow:
-Can we see a consistent SICI in TEPs from M1?
+Does the global activation of GABAARs with alprazolam affect the extent of SICI?
 
 ### Outcome variables
-- **TEP peak amplitude**: measured separately for each TEP component (6 components) 
+- **SICI**: calculated as the change of the SICI of each component (simple subtraction) following the piared-pulse stimulation as compared to the simple TS --> this measure serves to evaluate the effect of medication on SICI
 
 ### Fixed effect
-- **STIMULUS** 
-  0. single-pulse TS 
-  1. paired-pulse stimulus
+- **TIME** 
+  0. baseline 
+  1. post-medication
 - **MEDICATION**  
   0. placebo = control condition
   1. amplrazolam
+  
+- Covariate: **rMT change** - continuous value
 
 ### Random effect
 - random intercept for each **SUBJECT**
@@ -91,17 +93,17 @@ summary(data_all)
 ### Variable of interest
 ```{r variable}
 # variable characteristics
-target_peak <- 'P180'
+target_peak <- 'N17'
 
 # subset data
 data <- data_all %>% 
   filter(peak == target_peak) %>% 
   mutate(subject = factor(subject)) %>% 
-  mutate(stimulus = factor(stimulus, levels=c('TS', 'ppTMS'), ordered = TRUE)) %>% 
   mutate(medication = factor(medication, levels=c('placebo', 'alprazolam'), ordered = TRUE)) %>% 
-  # select(subject, medication, stimulus, amplitude)
-  select(subject, medication, stimulus, amplitude_MEP) %>%
-  mutate(amplitude = amplitude_MEP)
+  mutate(time = factor(time, levels=c('pre', 'post'), ordered = TRUE)) %>% 
+  select(subject, medication, time, SICI, rMT)
+  # select(subject, medication, time, SICI_MEP, rMT) %>%
+  # mutate(SICI = SICI_MEP)
 str(data)
 ```
 
@@ -112,50 +114,50 @@ The normality is checked both visually (histogram, QQ-plot) and using the Shapir
 # ---- DISTRIBUTION ----
 # get summary per medication
 data %>% 
-  select(c(stimulus, medication, amplitude)) %>% 
-  group_by(stimulus, medication) %>% 
+  select(c(medication, time, SICI)) %>% 
+  group_by(medication, time) %>% 
   skim()
 
 # calculate mean values
 data_mean <- data %>% 
-  group_by(medication, stimulus) %>% 
-  summarise(mean = mean(amplitude), sd = sd(amplitude), sem = sd(amplitude)/sqrt(20), median = median(amplitude))
+  group_by(medication, time) %>% 
+  summarise(mean = mean(SICI), sd = sd(SICI), sem = sd(SICI)/sqrt(20), median = median(SICI))
 data_mean %>% 
   knitr::kable()
 
 # plot the distribution
 data %>% 
-  ggplot(aes(x = amplitude, y = ..count.., fill = medication)) +
+  ggplot(aes(x = SICI, y = ..count.., fill = medication)) +
   geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
   geom_density(alpha = 0, size = 1) +
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   geom_vline(data = data_mean, aes(xintercept = median), linetype = 'dashed', size = 1) + 
   geom_vline(data = data_mean, aes(xintercept = mean), size = 1) + 
   ggtitle('original data') +
   ylab('count') +
-  xlab('amplitude') + 
+  xlab('SICI') + 
   theme(text = element_text(size = 15), legend.position = 'none') + 
   scale_fill_manual(values = col_palette[c(2, 4)]) 
 
 # skewness and kurtosis
 data_shape <- data %>% 
-  group_by(stimulus, medication) %>% 
-  summarise(skewness = skewness(amplitude), kurtosis = kurtosis(amplitude))
+  group_by(medication, time) %>% 
+  summarise(skewness = skewness(SICI), kurtosis = kurtosis(SICI))
 data_shape %>% 
   knitr::kable()
 
 # ---- NORMALITY TEST ----
 # QQ-plot
 data %>% 
-  ggplot(aes(sample = amplitude, col = medication)) + 
+  ggplot(aes(sample = SICI, col = medication)) + 
   geom_qq(size = 2.5) + 
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   scale_color_manual(values = col_palette[c(2, 4)]) 
 
 # Shapiro-Wilk test
 data %>% 
-  group_by(stimulus, medication) %>% 
-  shapiro_test(amplitude)
+  group_by(medication, time) %>% 
+  shapiro_test(SICI)
 
 ```
 
@@ -164,59 +166,59 @@ Transformations are applied only when needed - in the case of a non-normal distr
 The code below tests two possible transformations - square root and log transform with the base 2 - and their effect on the final distribution.
 ```{r transformation}
 # constants --> onset to positive values
-c <- -min(data$amplitude) + 1
+c <- -min(data$SICI) + 1
 data_trans <- data %>% 
   # filter(!(subject %in% remove_subj)) %>%
-  mutate(amplitude = amplitude + c)
+  mutate(SICI = SICI + c)
 
 # reflect if negatively skewed
 # data_trans <- data_trans %>%
-#   group_by(stimulus, medication) %>%
-#   mutate(amplitude = max(data_trans$amplitude) - amplitude + 1)
+#   group_by(time, medication) %>%
+#   mutate(SICI = max(data_trans$SICI) - SICI + 1)
 
 # ---- SQUARE ROOT ----
 # create new variable
 data_trans <- data_trans %>% 
-  mutate(amplitude_sqrt = sqrt(amplitude))
+  mutate(SICI_sqrt = sqrt(SICI))
 
 # plot by mediation
 data_trans %>% 
-  ggplot(aes(x = amplitude_sqrt, y = ..count.., fill = medication)) +
+  ggplot(aes(x = SICI_sqrt, y = ..count.., fill = medication)) +
   geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
   geom_density(alpha = 0, size = 1) +
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   ggtitle('square-rooted data') +
   ylab('count') +
-  xlab('amplitude') + 
+  xlab('SICI') + 
   theme(text = element_text(size = 15), legend.position = 'none') + 
   scale_fill_manual(values = col_palette[c(2, 4)]) 
 
 # Shapiro-Wilk test
 data_trans %>% 
-  group_by(stimulus, medication) %>% 
-  shapiro_test(amplitude_sqrt)
+  group_by(medication, time) %>% 
+  shapiro_test(SICI_sqrt)
 
 # ---- LOG TRANSFORM ----
 # create new variable
 data_trans <- data_trans %>% 
-  mutate(amplitude_log2 = log2(amplitude))
+  mutate(SICI_log2 = log2(SICI))
 
 # plot by mediation
 data_trans %>% 
-  ggplot(aes(x = amplitude_log2, y = ..count.., fill = medication)) +
+  ggplot(aes(x = SICI_log2, y = ..count.., fill = medication)) +
   geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
   geom_density(alpha = 0, size = 1) +
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   ggtitle('log-transformed data') +
   ylab('count') +
-  xlab('amplitude') + 
+  xlab('SICI') + 
   theme(text = element_text(size = 15), legend.position = 'none') + 
   scale_fill_manual(values = col_palette[c(2, 4)]) 
 
 # Shapiro-Wilk test
 data_trans %>% 
-  group_by(stimulus, medication) %>% 
-  shapiro_test(amplitude_log2)
+  group_by(medication, time) %>% 
+  shapiro_test(SICI_log2)
 ```
 
 ### Outlier rejection
@@ -224,23 +226,23 @@ If a serious outlier is identified, the subject might be removed from the datase
 ```{r outlier identification}
 # outlier threshold 
 out_threshold <- data %>% 
-  group_by(stimulus, medication) %>% 
-  summarize(a = quantile(amplitude, 0.75) - 1.5*IQR(amplitude), b = quantile(amplitude, 0.75) + 1.5*IQR(amplitude))
+  group_by(medication, time) %>% 
+  summarize(a = quantile(SICI, 0.75) - 1.5*IQR(SICI), b = quantile(SICI, 0.75) + 1.5*IQR(SICI))
 out_threshold %>% 
   knitr::kable()
 
 # idenntify outliers
-outliers <- boxplot.stats(data %>% group_by(stimulus, medication) %>% pull(amplitude))$out
-outliers_index <- which(data %>% group_by(stimulus, medication) %>% pull(amplitude) %in% c(outliers))
+outliers <- boxplot.stats(data %>% group_by(time, medication) %>% pull(SICI))$out
+outliers_index <- which(data %>% group_by(time, medication) %>% pull(SICI) %in% c(outliers))
 data[outliers_index,]
 
 # boxplot
 data %>% 
-  ggplot(aes(stimulus, amplitude, col = medication)) + 
+  ggplot(aes(time, SICI, col = medication)) + 
   geom_jitter(width = 0.2, size = 2.5, show.legend = FALSE) + 
   scale_color_manual(values = col_palette[c(2, 4)]) + 
   geom_boxplot(col = 'black', alpha = 0, width = 0.5) + 
-  ylab('amplitude') +
+  ylab('SICI') +
   xlab('medication') + 
   theme(text = element_text(size = 15))
 ```
@@ -254,49 +256,49 @@ remove_subj <- 2
 # get summary per medication
 data_filt <- data %>% 
   filter(!(subject %in% remove_subj)) %>% 
-  select(c(medication, stimulus, amplitude)) %>% 
-  group_by(medication, stimulus)
+  select(c(medication, time, SICI)) %>% 
+  group_by(medication, time)
 
 # calculate mean values
 data_mean <- data_filt %>% 
-  group_by(medication, stimulus) %>% 
-  summarise(mean = mean(amplitude), sd = sd(amplitude), sem = sd(amplitude)/sqrt(19), median = median(amplitude))
+  group_by(medication, time) %>% 
+  summarise(mean = mean(SICI), sd = sd(SICI), sem = sd(SICI)/sqrt(19), median = median(SICI))
 data_mean %>% 
   knitr::kable()
 
 # plot the distribution
 data_filt %>% 
-  ggplot(aes(x = amplitude, y = ..count.., fill = medication)) +
+  ggplot(aes(x = SICI, y = ..count.., fill = medication)) +
   geom_histogram(binwidth = 1, col = 'white', alpha = 0.5) +
   geom_density(alpha = 0, size = 1) +
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   geom_vline(data = data_mean, aes(xintercept = median), linetype = 'dashed', size = 1) + 
   geom_vline(data = data_mean, aes(xintercept = mean), size = 1) + 
   ggtitle('original data') +
   ylab('count') +
-  xlab('amplitude') + 
+  xlab('SICI') + 
   theme(text = element_text(size = 15), legend.position = 'none') + 
   scale_fill_manual(values = col_palette[c(2, 4)]) 
 
 # skewness and kurtosis
 data_shape <- data_filt %>% 
-  group_by(medication, stimulus) %>% 
-  summarise(skewness = skewness(amplitude), kurtosis = kurtosis(amplitude))
+  group_by(medication, time) %>% 
+  summarise(skewness = skewness(SICI), kurtosis = kurtosis(SICI))
 data_shape %>% 
   knitr::kable()
 
 # ---- NORMALITY TEST ----
 # QQ-plot
 data_filt %>% 
-  ggplot(aes(sample = amplitude, col = medication)) + 
+  ggplot(aes(sample = SICI, col = medication)) + 
   geom_qq(size = 2.5) + 
-  facet_grid(stimulus ~ medication) + 
+  facet_grid(medication ~ time) + 
   scale_color_manual(values = col_palette[c(2, 4)]) 
 
 # Shapiro-Wilk test
 data_filt %>% 
-  group_by(medication, stimulus) %>% 
-  shapiro_test(amplitude)
+  group_by(medication, time) %>% 
+  shapiro_test(SICI)
 ```
 
 ### Build models and compare
@@ -306,15 +308,15 @@ Based on the previous exploration, choose appropriate adjustment to the data.
 trans <- readline(prompt = "Use transformation: ")
 if(trans == 'sqrt'){
   data <- data %>%
-    mutate(amplitude_model = data_trans$amplitude_sqrt)
+    mutate(SICI_model = data_trans$SICI_sqrt)
 }
 if(trans == 'log'){
   data <- data %>%
-  mutate(amplitude_model = data_trans$amplitude_log2)
+  mutate(SICI_model = data_trans$SICI_log2)
 }
 if(trans == 'none'){
   data <- data %>%
-  mutate(amplitude_model = amplitude)
+  mutate(SICI_model = SICI)
 }
 
 # remove outliers if necessary
@@ -327,7 +329,7 @@ if(out){
 
 Model n. 1: simple linear regression without random effects
 ```{r  regression}
-model_lm <- lm(amplitude_model ~ stimulus + medication,
+model_lm <- lm(SICI_model ~ time + medication + time*medication,
   data = data
 )
 summary(model_lm)
@@ -337,7 +339,7 @@ confint(model_lm)
 Model n. 2: empty model with random intercept
 ```{r random intercept}
 model_ri <- lmer(
-  amplitude_model ~ 1 + (1|subject),
+  SICI_model ~ 1 + (1|subject),
   data = data
 )
 summary(model_ri)
@@ -347,7 +349,7 @@ confint(model_ri)
 Model n. 3: predictor variables + random intercept
 ```{r predictors}
 model_rip <- lmer(
-  amplitude_model ~ stimulus + medication + (1|subject),
+  SICI_model ~ time + medication + time*medication + rMT + (1|subject),
   data = data
 )
 summary(model_rip)
@@ -363,7 +365,7 @@ Describe the full model using the nlme package in order to extract the p-value o
 ```{r final model}
 # choose the model to retain
 model <- lme(
-  amplitude_model ~ stimulus + medication,
+  SICI_model ~ time + medication + time*medication + rMT,
   random = ~ 1|subject,
   data = data,
   method = 'ML'

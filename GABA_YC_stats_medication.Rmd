@@ -333,7 +333,7 @@ Based on the previous exploration, choose appropriate adjustment to the data.
 ```{r final data}
 # choose transformation if necessary
 trans <- readline(prompt = "Use transformation: ")
-if(trans == 'sqrt'){
+if(trans == 'sqrt'){non
   data <- data %>%
     mutate(DV_model = data_trans$DV_sqrt)
 }
