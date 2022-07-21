@@ -1,7 +1,7 @@
-%% GABA-AD: TEPs - TOPOGRAPHICAL ANALYSIS
+%% GABA-AD: TEPs - TOPOGRAPHIC ANALYSIS
 % Written by Dominika for GABA-AD project (2022)
 % 
-% Colection of scripts to visualize the outcome of the topographical analysis performed in Ragu 
+% Colection of scripts to visualize the outcome of the topographic analysis performed in Ragu 
 %   --> figures are saved in a folder 'GABA_YC_figures'
 % 
 % 1) load Ragu output
@@ -160,8 +160,8 @@ clear c i data_visual fig yl I P lgd figure_name incons
 
 %% 4) ALL COMPARISONS: TANOVA  
 % define comparisons of interest
-comps = {1, 1, 3, 3, 3};
-for c = 1:length(condition)
+comps = {2, 2, 3, 3, 3};
+for c = 1:2%length(condition)
     statement = ['comps_name = {data.' condition{c} '.strF1, data.' condition{c} '.strF2, [data.' condition{c} '.strF1 ''_'' data.' condition{c} '.strF2]};'];
     eval(statement)    
     comps{2, c} = comps_name{comps{1, c}};
@@ -169,7 +169,7 @@ end
 clear c comps_name
 
 % plot TANOVA results for selected comparisons
-for c = 1:numel(condition)
+for c = 1:2%numel(condition)
     % ----- TANOVA p value -----
     % load data
     statement = ['data_visual = squeeze(data.' condition{c} '.PTanova(1, 1 + comps{1, c}, :, 1));'];

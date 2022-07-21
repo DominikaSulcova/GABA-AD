@@ -1154,6 +1154,17 @@ figure_counter = figure_counter + 1;
 data_visual = cat(2, GABA_YC_results.SICI(1).MEP.post', GABA_YC_results.SICI(2).MEP.post');
 label = ['medication' medication];
 
+% calculate mean drug-induced chanege in MEP SICI
+MEP_change = struct;
+for m = 1:length(medication)
+    for p = 1:length(participant)
+        MEP_change.individual(p, m) = (100 - GABA_YC_results.SICI(m).MEP.post(p))/(100 - GABA_YC_results.SICI(m).MEP.pre(p)) * 100;
+    end
+    MEP_change.mean(m) = mean(MEP_change.individual(:, m));
+    MEP_change.sd(m) = std(MEP_change.individual(:, m));
+    MEP_change.sem(m) = std(MEP_change.individual(:, m))/sqrt(length(participant));
+end
+
 % plot the boxplot
 fig = plot_scatter(data_visual, figure_counter, colours([2, 4], :), 'comparison', label)
 
