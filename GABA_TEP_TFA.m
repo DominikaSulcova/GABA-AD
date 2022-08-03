@@ -5,7 +5,7 @@
 % outcome and run randomisation-based statistics on the results
 % 
 % Custom functions are included in the script, EEGLAB and letswave
-% functions are being called from their directories
+% functions are being called from directories (paths need to be added)
 % 
 % Output:
 %   --> figures are saved in a folder 'GABA_YC_figures'
@@ -27,7 +27,7 @@
 %       - saves for letswave
 % 
 % ------ BASELINE ------
-% 3) significant ERSP
+% ) significant ERSP
 %       - merges individual data to a single dataset per condition
 %       - calculates t-test against 0 for baseline datasets
 %           --> keeps only 'average' and C3 channels
@@ -330,8 +330,52 @@ for s = 1:length(stimulus)
 end
 clear p m t s o f subj filename option lwdata f_start f_end lwdata_new lwdataset 
 
+%% ) BASELINE: significant ERSP - all timepoints
+% ----- section input -----
+window_crop = [0.01 0.5];
+alpha = 0.05;
+alpha_cl = 0.05;
+n_perm = 1000;
+suffix = 'signif';
+% -------------------------
+for s = 1:2
+    for m = 1:length(medication)
+        for t = 1:length(time)
+            for o = 1:length(oscillations)
+                for f = 1:length(fband.bands)
+                    % identify dataset
+                    filename = sprintf('merged_subj %s %s %s %s %s %s', ...
+                        fband.bands{f}, prefix, medication{m}, time{t}, stimulus{s}, oscillations{o});
+                    
+                    % load dataset
+                    option = struct('filename', [folder_input '\' filename]);
+                    lwdata = FLW_load.get_lwdata(option);
+                    
+                    % crop time interval of interest
+                    x_start = (window_crop(1) - lwdata.header.xstart)/lwdata.header.xstep;
+                    x_end = (window_crop(2) - lwdata.header.xstart)/lwdata.header.xstep;
+                    lwdata.data = lwdata.data(:, :, :, :, :, x_start:x_end);
+                    
+                    % update header
+                    lwdata.header.datasize = size(lwdata.data);
+                    lwdata.header.xstart = window_crop(1);
+                    
+                    % test for significant changes against 0
+                    option  = struct('constant', 0, 'tails', 'both', 'alpha', alpha, 'permutation', 1, 'cluster_threshold', alpha_cl, ...
+                        'num_permutations', n_perm, 'show_progress', 0, 'suffix', suffix, 'is_save', 1);
+                    signif = FLW_ttest_constant.get_lwdata(lwdata, option);  
+                end
+            end
+        end
+    end
+end
+clear s m t o f filename option lwdata x_start x_end window_crop alpha alpha_cl n_perm 
 
-%% ) BASELINE: significant ERSP
+% update prefix
+prefix = [suffix ' ' prefix];
+clear suffix 
+
+%% ) BASELINE: significant ERSP - all frequencies & plot
 % ----- section input -----
 channel = {'average'};
 alpha = 0.05;
