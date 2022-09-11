@@ -14,22 +14,18 @@ The aims of the project are:
     patient groups
 
 Two different types of GABAA-mediated inhibition were investigated:
-1)  tonic global activation of the GABAergic inhibitory system induced by GABA A receptor stimulation with benzodiazepines
+1)  global activation of the GABAergic inhibitory system induced by GABA A receptor stimulation with benzodiazepines
     --> changes observed in TEP and MEP amplitude and in RS-EEG variables
-2)  local phasic GABA A activation induced by sub-threshold conditioning TMS pulse (CS) preceding the testing stimulus (TS)
+2)  local, phasic GABA A activation induced by sub-threshold conditioning TMS pulse (CS) preceding the testing stimulus (TS)
     --> short-latency intracortical inhibition (SICI) = amplitude reduction of TEPs and MEPs
 
-_**Question 1: Does alprazolam change the outcome measures?**
-= Is there a time-related change that can be only observable after alprazolam, and not placebo?_
+_**Question 1: How does pharmacological stimulation of GABAARs with alprazolam influence the outcome measures?**
+--> Is there a change in TEPs, MEPs or RS-EEG that can be only observed after alprazolam, and not placebo?
+--> Is there a correlation across alprazolam-induced changes in different measures?_
 
-_**Question 2: Are some of the alprazolam-induced changes in outcome measures site specific?**
-= Is there a difference between effects observed in M1 and AG TEPs?_
-
-_**Question 3: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
-Can we identify TEP component(s) that predict the MEP SICI (change in MEP amplitude)?_
-
-_**Question 4:  What are the differences in changes in outcome measures following tonic and phasic GABAAR activation?**
-What are the similarities = changes that can be attributed in general to GABAA activation?_
+_**Question 2: Can we observe changes in TEP and MEP amplitudes following the paired pulse protocol?**
+--> Can we identify TEP component(s) that predict the MEP SICI?
+--> How does TEP SICI relate to the previously described effect of alprazolam?_
 
 Experimental protocol
 ------------------------------------------------------------
@@ -80,9 +76,10 @@ resting motor threshold (rMT) and subjective vigilance assessment were included 
     AG was stimulated with 100%rMT. TEPs were also recorded following the application of paired-pulse protocol over the M1 aiming
     to record SICI.
 
-    Following data preprocessing and cleaning, TEPs were characterised at the group level to identify peaks with consistent latencies
-    and topographies. Based on these, 3 electrodes of interest (EOIs) were identified that best represented each TEP component,
-    and the pooled signal from these EOIs was used to extract peak amplitude for each individual subject and condition.
+    Following data preprocessing and cleaning, TEPs were characterised at the group level using **Microstate analysis** as implemented
+    in the RAGU software in order to identify the duration and topographic distribution of individual TEP components. Based on these,
+    3 electrodes of interest (EOIs) located at the maximum amplitude were chosen for each component, and the pooled signal from these EOIs
+    was used to extract peak amplitude for each individual subject and condition.
     Rather than taking one-datapoint peak amplitude, windows of default lengths were first determined for each TEP component
     and their latency was individually adjusted for each dataset, then the mean amplitude was calculated as the average
     of 25% of most prominent datapoints within the window. Peak latency was calculated as the median x value of these averaged datapoints.
@@ -100,7 +97,7 @@ are available in the repository as following word documents:
 - GABA-AD_PROTOCOL_TMS-EMG
 
 ------------------------------------------------------------
-AVAILABLE SCRIPTS & FUNCTIONS
+AVAILABLE SCRIPTS
 ------------------------------------------------------------
 
 RS-EEG
@@ -114,8 +111,7 @@ preprocessing:
 RS-EEG analysis:
 - GABA_rsEEG_amplitude.m
 - GABA_rsEEG_SE.m
-- fitPowerLaw3steps.m
-- log_int.m
+- GABA_rsEEG_YC_process.m
 - GABA_rsEEG_visualization.m
 
 
@@ -137,10 +133,9 @@ preprocessing:
 - GABA_EEG_ica_timecourse.lwscript
 
 TEP analysis:
-- GABA_EEG_amplitude.m
-- GABA_EEG_meanamp.m
-- GABA_EEG_topoplot.m
-
+- GABA_YC_topography.m
+- GABA_TEP_YC_M1_process.m
+- GABA_TEP_YC_AG_process.m
 
 EMG: MEPs from M1
 ------------------------------------------------------------
@@ -151,8 +146,9 @@ import:
 preprocessing + MEP analysis:
 - GABA_EMG_process.m
 
-
 Group analysis & statistics
 ------------------------------------------------------------
-- GABA_group_analysis.m
-- correlation_preview.m
+- GABA_YC_export.m
+- GABA_YC_stats_medication.rmd
+- GABA_YC_stats_SICI.rmd
+- GABA_YC_stats_SICIxmedication.rmd

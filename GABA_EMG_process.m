@@ -40,7 +40,7 @@ prefix_2 = 'nozero';
 output_name = 'GABA_MEP';
 
 % baseline filter
-baseline = -0.1;
+baseline = -0.2;
 threshold = 15;
 allow_sd = 3;
 
