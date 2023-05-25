@@ -1070,6 +1070,11 @@ wd = table([repmat(medication(1), length(time), 1); repmat(medication(2), length
     [1:length(time) 1:length(time)]','VariableNames',{'medication','time'});
 wd.medication = categorical(wd.medication); wd.time = categorical(wd.time);
 
+wd = table([repmat(medication(1), 1, 1); repmat(medication(2), 1, 1)],'VariableNames',{'medication'});
+wd.medication = categorical(wd.medication);
+rm = fitrm(data_table, 'placebo_pre-alprazolam_pre ~ 1', 'WithinDesign', wd);
+ranova_rMT = ranova(rm, 'WithinModel', 'medication');
+
 % rm-ANOVA
 rm = fitrm(data_table, 'placebo_pre-alprazolam_post ~ 1', 'WithinDesign', wd);
 

@@ -2444,6 +2444,11 @@ clear a p k m data_visual scat p_line fig figure_name peak_n polarity
 save(output_file, 'GABA_SICI_peaks', '-append');
 clear col subj datasize measures avg_amp avg_amp_sem
 
+%% CHANGES IN FREQUENCY DOMAIN: LOAD THE DATA
+% load the data
+
+
+
 %% functions
 function peak_x = gfp_plot(x, y, time_window, xstep, labeled, varargin)
 % check whether to plot labels (default)
