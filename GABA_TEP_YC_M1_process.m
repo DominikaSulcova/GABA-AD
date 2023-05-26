@@ -34,26 +34,28 @@
 % 
 % 6) DISS
 % 
-% 7) export data for RAGU
+% 7) DISS + randomisation statistics
+% 
+% 8) export data for RAGU
 %   - removes 'target' channel
 %   - saves time-series in a .csv table, timepoint x channel (export folder)
 %   - creates an .xyz file with the electrode montage
 % 
-% 8) extract GFP amplitude 
+% 9) extract GFP amplitude 
 % 
-% 9) plot mean change in GFP amplitudes 
+% 10) plot mean change in GFP amplitudes 
 % 
-% 10) extract TEP amplitude 
+% 11) extract TEP amplitude 
 % 
-% 11) plot mean change in TEP peaks
+% 12) plot mean change in TEP peaks
 % 
-% 12) calculate SICI
+% 13) calculate SICI
 % 
-% 13) visualize TEP peak amplitude change in SICI
+% 14) visualize TEP peak amplitude change in SICI
 % 
-% 14) extract TEP amplitude 
+% 15) extract TEP amplitude 
 % 
-% 15) plot SICI peaks
+% 16) plot SICI peaks
 
 %% parameters
 clear all; clc
@@ -671,7 +673,113 @@ clear m s data_visual figure_name
 save(output_file, 'GABA_data_norm', 'GABA_DISS', '-append');
 clear data_temp fig 
 
-%% 7) export data for Ragu
+%% 7) DISS medication + randomisation statistics
+% ----- section input -----
+rep = 2000;
+alpha = 0.05;
+% -------------------------
+% load data normalized by GFP if not loaded
+if exist('GABA_data_norm') ~= 1
+    load([folder_results '\' filename '.mat'], 'GABA_data_norm')
+end
+
+% evaluate the effect of time for each medication & stimulus (CS + TS)
+for m = 1:length(medication)
+    % calculate average TEP per category
+    for s = 1:2 
+        for t = 1:length(time)
+            TEP_avg(m, t, s, :, :) = squeeze(mean(GABA_data_norm(m, t, s, :, :, :), 4));
+        end
+        
+        % calculate DISS = quantifier
+        for i = 1:size(TEP_avg, 5)
+            diff = squeeze(TEP_avg(m, 2, s, :, i) - TEP_avg(m, 1, s, :, i));
+            DISS_real(m, s, i) = sqrt(mean(diff.^2));
+        end 
+        
+        % calculate empirical distribution 
+        idx = [true(1, 20), false(1, 20)];  
+        for r = 1:rep
+            % create randomly shuffled datasets
+            idx_r = [idx(randperm(40))];
+            dataset = cat(1, squeeze(GABA_data_norm(m, 1, s, :, :, :)), squeeze(GABA_data_norm(m, 2, s, :, :, :)));
+            dataset_rand(1, :, :) = squeeze(mean(dataset(idx_r, :, :), 1));
+            dataset_rand(2, :, :) = squeeze(mean(dataset(~idx_r, :, :), 1));
+            
+            % calculate DISS
+            for i = 1:size(dataset_rand, 3)
+                diff = squeeze(dataset_rand(1, :, i) - dataset_rand(2, :, i));
+                DISS_distribution(m, s, r, i) = sqrt(mean(diff.^2));
+            end 
+        end
+        
+        % calculate p value
+        for i = 1:size(DISS_distribution, 4)
+            p_val(m, s, i) = sum(squeeze(DISS_distribution(m, s, :, i)) >= DISS_real(m, s, i)) / rep;
+        end  
+        
+        % extract limits of significant clusters
+        signif = false;
+        counter = 1;
+        for i = 1:size(p_val, 3)
+            if p_val(m, s, i) <= alpha & ~signif
+                cluster_lim{m, s}(1, counter) = x(i);
+                signif = true;
+            elseif p_val(m, s, i) > alpha & signif
+                cluster_lim{m, s}(2, counter) = x(i-1);
+                counter = counter + 1;
+                signif = false;
+            end
+        end
+        
+        % plot DISS and mark significance
+        data_visual = squeeze(DISS_real(m, s, :))';
+        fig = figure(figure_counter); 
+        hold on
+
+        % plot significant timepoints
+        for i = 1:size(p_val, 3)
+            if p_val(m, s, i) <= alpha
+                line([x(i), x(i)], [0 1], 'Color', [0.96, 0.73, 0.73])
+                hold on
+            end
+        end
+        
+        % plot the original DISS value
+        plot(x, data_visual, 'Color', colours((m-1)*2 + s, :), 'LineWidth', 2.5)
+        
+        % adjust figure parameters
+        fig_title = sprintf('global dissimilarity: %s, %s', medication{m}, stimulus{s});
+        title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
+        set(gca, 'fontsize', 12); xlabel('time (s)')
+        ax = gca; ax.XColor = [0.5 0.5 0.5];
+        ylim([0 1]); 
+        line([0, 0], [0 1], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
+        set(gca, 'Layer', 'Top')
+        hold off
+        
+        % save figure 
+        fig_name = sprintf('DISS+p_%s_%s', medication{m}, stimulus{s});
+        savefig([folder_figures '\' fig_name '.fig'])
+        saveas(fig, [folder_figures '\' fig_name  '.svg'])  
+        
+        % update the counter
+        figure_counter = figure_counter + 1;       
+    end    
+end
+
+% create a structure with all data
+GABA_DISS_medication = struct;
+GABA_DISS_medication.DISS_real = DISS_real;
+GABA_DISS_medication.DISS_distribution = DISS_distribution;
+GABA_DISS_medication.p_val = p_val;
+GABA_DISS_medication.cluster_lim = cluster_lim;
+
+% append new variables to the general MATLAB file
+save(output_file, 'GABA_DISS_medication', '-append');
+clear rep m t s i TEP_avg r idx_r dataset dataset_rand data_visual fig_name signif
+
+%% 8) export data for Ragu
 % write text files for Ragu --> uncorrected ppTMS TEPs
 for m = 1:length(medication)
     for t = 1:length(time)
@@ -713,7 +821,7 @@ end
 fclose(fileID)
 clear name fileID a folder_name
 
-%% 8) GFP amplitude extraction
+%% 9) GFP amplitude extraction
 % ----- decide output parameters -----
 GABA_TEP_default.peak = {'N17' 'P30' 'N45' 'P60' 'N100' 'P180'};            % peaks of interest
 GABA_TEP_default.center = [0.017 0.03 0.045 0.06 0.10 0.2];                 % default starting latencies
@@ -1011,7 +1119,7 @@ writetable(GABA_GFP_peaks_table, 'GABA_GFP_peaks_table.csv')
 save(output_file, 'GABA_TEP_default', 'GABA_GFP_peaks', '-append');
 clear percent map_lims
 
-%% 9) plot mean change in GFP amplitudes  
+%% 10) plot mean change in GFP amplitudes  
 % calculate indicidual GFP change for each peak   
 for p = 2:length(participant)
     for m = 1:length(medication)
@@ -1089,7 +1197,7 @@ for s = 1:length(stimulus)
 end
 clear p s k m data_visual scat col p_line fig figure_name pos_x
 
-%% 10) TEP amplitude extraction
+%% 11) TEP amplitude extraction
 % ----- decide output parameters -----
 GABA_TEP_default.eoi.CS = {{} {'Cz' 'CP1' 'C1'} {'C3' 'FC1' 'FC5'} {'Cz' 'CP1' 'C1'} {'Fz' 'FC2' 'F4'} {'Cz'}}; 
 GABA_TEP_default.eoi.TS = {{'C3' 'CP1' 'CP5'} {'Cz' 'CP1' 'C1'} {'C3' 'FC1' 'FC5'} {'C1' 'C3' 'CP1'} {'Cz' 'FC1' 'C1'} {'Cz' 'FC2' 'C2'}}; 
@@ -1409,7 +1517,7 @@ writetable(GABA_TEP_peaks_table, 'GABA_TEP_peaks_table.csv')
 save(output_file, 'GABA_TEP_default', 'GABA_TEP_peaks', '-append');
 clear percent map_lims
 
-%% 11) plot mean change in TEP peaks
+%% 12) plot mean change in TEP peaks
 % parameters
 col = colours([2, 4], :);
 measures = {'mean amplitude' 'peak amplitude' 'latency'};
@@ -1621,7 +1729,7 @@ clear a p s k m data_visual scat p_line fig figure_name peak_n polarity
 save(output_file, 'GABA_TEP_peaks', '-append');
 clear col datasize measures avg_amp avg_amp_sem
 
-%% 12) SICI
+%% 13) SICI
 % ----- decide output parameters -----
 electrode = {'C3'};
 linestyle = {'-' ':'};
@@ -1930,7 +2038,7 @@ for b = 1:4
     hold on
 end
 
-%% 13) SICI: TEP peak amplitude change
+%% 14) SICI: TEP peak amplitude change
 % calculate individual change for peak amplitude of each TEP peak --> only at the baseline  
 for p = 1:length(participant)
     for m = 1:length(medication)
@@ -1996,7 +2104,7 @@ figure_counter = figure_counter + 1;
 clear a b s m k i peak_n fig fig_name ngroups nbars groupwidth fig barplot ...
     data_visual sem_visual polarity peak_counter x_bar
 
-%% 14) SICI amplitude extraction
+%% 15) SICI amplitude extraction
 % ----- decide output parameters -----
 GABA_SICI.default.peak = {'P20' 'N60' 'P200'};           
 GABA_SICI.default.center = [0.02 0.06 0.180];                
@@ -2293,7 +2401,7 @@ writetable(GABA_SICI_peaks_table, 'GABA_SICI_peaks_table.csv')
 save(output_file, 'GABA_SICI', 'GABA_SICI_peaks', '-append');
 clear percent map_lims
 
-%% 15) plot SICI peaks
+%% 16) plot SICI peaks
 % ----- plot baseline -----
 % get data
 data_visual = []; sem_visual = [];
@@ -2542,8 +2650,8 @@ title(fig_title, 'FontSize', 16, 'FontWeight', 'bold')
 set(gca, 'fontsize', 12); xlabel('time (s)')
 ax = gca; ax.XColor = [0.5 0.5 0.5];
 plot(x, data_visual(1, :), 'Color', colours(1, :), 'LineWidth', 2.5)
-fill([x fliplr(x)],c, ...
-    colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
+% fill([x fliplr(x)],c, ...
+%     colours(2, :) , 'facealpha', 0.5, 'linestyle', 'none');
 line(time_window, [0 0], 'Color', [0, 0, 0], 'LineWidth', 0.5)
 line(time_window, [1 1], 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5)
 line([0, 0], [-0.75 1.75], 'LineStyle', '--', 'Color', [0, 0, 0], 'LineWidth', 2.5) 
